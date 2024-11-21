@@ -1,6 +1,7 @@
 import tkinter as tk
 from tkinter import filedialog, scrolledtext, messagebox
 import subprocess
+import translate_to_c
 from pygments import lex
 from pygments.lexers import PythonLexer
 from pygments.token import Token
