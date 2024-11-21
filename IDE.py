@@ -97,30 +97,38 @@ output_area.pack(fill=tk.BOTH, expand=True)
 # Update line numbers every 100 ms
 update_line_numbers()
 
+# Function to translate Draw++ to C
+def translate_to_c(draw_code):
+    # Replace Draw++ syntax with C syntax
+    draw_code = draw_code.replace(" = ", " <- ")  # Draw++ assignment
+    draw_code = draw_code.replace(" == ", " eq ")  # Draw++ equality check
+    draw_code = draw_code.replace(" != ", " neq ")  # Draw++ inequality check
+    draw_code = draw_code.replace("&&", "&")  # Draw++ AND
+    draw_code = draw_code.replace(" || ", " OR ")  # Draw++ OR
+    draw_code = draw_code.replace("fonction", "function")  # Draw++ function
+    draw_code = draw_code.replace(" if", "if")  # if statement
+    draw_code = draw_code.replace(" else", "else")  # else statement
+    
+    # No semicolon after function call or declaration
+    lines = draw_code.split("\n")
+    for i, line in enumerate(lines):
+        if line.strip().endswith(";"):
+            lines[i] = line.strip()[:-1]  # Remove semicolon from lines
+    
+    return "\n".join(lines)
+
 # Function to generate C code
 def generate_c_code():
-    code = text_area.get("1.0", tk.END)  # Get the text from the editor
-    if "afficher une liste" in code.lower():  # Check if the text contains "afficher une liste"
-        c_code = """
-#include <stdio.h>
-
-int main() {
-    int list[10] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
+    draw_code = text_area.get("1.0", tk.END)  # Get the text from the editor
+    c_code = translate_to_c(draw_code)
     
-    // Print the elements of the list
-    for (int i = 0; i < 10; i++) {
-        printf("%d\\n", list[i]);
-    }
-
-    return 0;
-}
-"""
-        with open("generated_list_display.c", "w") as file:
-            file.write(c_code)
-        
-        output_area.delete("1.0", tk.END)
-        output_area.insert(tk.END, "Code C generated: generated_list_display.c\n")
-        print("Code C generated in 'generated_list_display.c'.")
+    # Save the translated C code into a file
+    with open("generated_program.c", "w") as file:
+        file.write(c_code)
+    
+    output_area.delete("1.0", tk.END)
+    output_area.insert(tk.END, "C code generated: generated_program.c\n")
+    print("C code generated in 'generated_program.c'.")
 
 # Add Generate C button to toolbar
 generate_button = tk.Button(toolbar_frame, text="Generate C Code", command=generate_c_code, bg="#44475a", fg="#f8f8f2", relief=tk.FLAT)
@@ -129,7 +137,7 @@ generate_button.pack(side=tk.LEFT, padx=5, pady=5)
 # Function to compile and run the C code
 def compile_and_run_c_code():
     # Compile the generated C file
-    compile_command = ["gcc", "generated_list_display.c", "-o", "generated_list_display"]
+    compile_command = ["gcc", "generated_program.c", "-o", "generated_program"]
     result = subprocess.run(compile_command, capture_output=True, text=True)
     
     # If compilation is successful
@@ -138,7 +146,7 @@ def compile_and_run_c_code():
         output_area.insert(tk.END, "Compilation successful, running C program...\n")
         
         # Run the compiled program
-        run_command = ["./generated_list_display"]
+        run_command = ["./generated_program"]
         execution_result = subprocess.run(run_command, capture_output=True, text=True)
         
         # Display the output of the execution
