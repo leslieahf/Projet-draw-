@@ -100,12 +100,12 @@ update_line_numbers()
 # Function to translate Draw++ to C
 def translate_to_c(draw_code):
     # Replace Draw++ syntax with C syntax
-    draw_code = draw_code.replace(" = ", " <- ")  # Draw++ assignment
-    draw_code = draw_code.replace(" == ", " eq ")  # Draw++ equality check
-    draw_code = draw_code.replace(" != ", " neq ")  # Draw++ inequality check
-    draw_code = draw_code.replace("&&", "&")  # Draw++ AND
-    draw_code = draw_code.replace(" || ", " OR ")  # Draw++ OR
-    draw_code = draw_code.replace("fonction", "function")  # Draw++ function
+    draw_code = draw_code.replace(" <- ", " = ")  # Draw++ assignment
+    draw_code = draw_code.replace(" eq ", " == ")  # Draw++ equality check
+    draw_code = draw_code.replace(" neq ", " != ")  # Draw++ inequality check
+    draw_code = draw_code.replace("&", "&&")  # Draw++ AND
+    draw_code = draw_code.replace(" OR ", " || ")  # Draw++ OR
+    draw_code = draw_code.replace("function", "function")  # Draw++ function
     draw_code = draw_code.replace(" if", "if")  # if statement
     draw_code = draw_code.replace(" else", "else")  # else statement
     
