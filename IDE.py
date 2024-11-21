@@ -98,26 +98,6 @@ output_area.pack(fill=tk.BOTH, expand=True)
 # Update line numbers every 100 ms
 update_line_numbers()
 
-# Function to translate Draw++ to C
-def translate_to_c(draw_code):
-    # Replace Draw++ syntax with C syntax
-    draw_code = draw_code.replace(" <- ", " = ")  # Draw++ assignment
-    draw_code = draw_code.replace(" eq ", " == ")  # Draw++ equality check
-    draw_code = draw_code.replace(" neq ", " != ")  # Draw++ inequality check
-    draw_code = draw_code.replace("&", "&&")  # Draw++ AND
-    draw_code = draw_code.replace(" OR ", " || ")  # Draw++ OR
-    draw_code = draw_code.replace("function", "function")  # Draw++ function
-    draw_code = draw_code.replace(" if", "if")  # if statement
-    draw_code = draw_code.replace(" else", "else")  # else statement
-    
-    # No semicolon after function call or declaration
-    lines = draw_code.split("\n")
-    for i, line in enumerate(lines):
-        if line.strip().endswith(";"):
-            lines[i] = line.strip()[:-1]  # Remove semicolon from lines
-    
-    return "\n".join(lines)
-
 # Function to generate C code
 def generate_c_code():
     draw_code = text_area.get("1.0", tk.END)  # Get the text from the editor
