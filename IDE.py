@@ -98,10 +98,11 @@ output_area.pack(fill=tk.BOTH, expand=True)
 # Update line numbers every 100 ms
 update_line_numbers()
 
+
 # Function to generate C code
 def generate_c_code():
     draw_code = text_area.get("1.0", tk.END)  # Get the text from the editor
-    c_code = translate_to_c(draw_code)
+    c_code = translate_to_c.translate_to_c(draw_code)
     
     # Save the translated C code into a file
     with open("generated_program.c", "w") as file:
