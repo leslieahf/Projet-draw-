@@ -119,7 +119,7 @@ generate_button.pack(side=tk.LEFT, padx=5, pady=5)
 # Function to compile and run the C code
 def compile_and_run_c_code():
     # Compile the generated C file
-    compile_command = ["gcc", "generated_program.c", "-o", "generated_program"]
+    compile_command = ["gcc", "generated_program.c", "-o", "generated_program", "-lSDL2"]
     result = subprocess.run(compile_command, capture_output=True, text=True)
     
     # If compilation is successful
