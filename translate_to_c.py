@@ -17,23 +17,9 @@ def translate_to_c(draw_code):
     # Construire le code C à l'intérieur de main()
     c_code = ["#include <SDL2/SDL.h>"]
     c_code.append("#include <stdio.h>")
+    c_code.append("#include <stdbool.h>")
     c_code.append("")
 
-    c_code.append("""
-    void drawCarre(SDL_Renderer* renderer, int x, int y, int taille, int r, int g, int b) {
-        SDL_SetRenderDrawColor(renderer, r, g, b, 255);  // Définir la couleur du carré
-        SDL_Rect rect = {x, y, taille, taille};  // Définir les dimensions et la position du carré
-        SDL_RenderFillRect(renderer, &rect); // Dessiner le carré
-    }
-    """)
-    c_code.append("""
-    void dessinerRectangle(SDL_Renderer* renderer, int x, int y, int largeur, int hauteur, int r, int g, int b) {
-    SDL_SetRenderDrawColor(renderer, r, g, b, 255);  // Définir la couleur du rectangle
-    SDL_Rect rect = {x, y, largeur, hauteur};       // Définir la position et la taille du rectangle
-    SDL_RenderFillRect(renderer, &rect);              // Dessiner le rectangle
-    }
-    """)
-    
     c_code.append("int main() {")  # Début de la fonction main
 
     for i, line in enumerate(lines):
@@ -46,7 +32,7 @@ def translate_to_c(draw_code):
        
         elif line.startswith("draw"): 
             # Extraire les informations entre les parenthèses
-            arguments = line[line.find("(") + 1 : line.rfind(")")]
+            arguments = line[line.find("(") + 1: line.rfind(")")]
 
             # Diviser les arguments intelligemment en tenant compte des guillemets
             def split_arguments(argument_string):
@@ -55,74 +41,107 @@ def translate_to_c(draw_code):
                 current = ""
                 in_quotes = False  # Flag pour savoir si on est à l'intérieur de guillemets
                 for char in argument_string:
-                    if char == "," and not in_quotes:
+                    if char == "\"":  # Toggle l'état des guillemets
+                        in_quotes = not in_quotes
+                    elif char == "," and not in_quotes:
                         # Si on rencontre une virgule hors des guillemets, on termine un argument
                         args.append(current.strip())
                         current = ""
                     else:
                         current += char
-                        if char == "\"":
-                            in_quotes = not in_quotes  # Toggle l'état des guillemets
                 # Ajouter le dernier argument
                 if current:
                     args.append(current.strip())
                 return args
+
             # Diviser les arguments
             raw_args = split_arguments(arguments)
+
             # Traiter chaque argument
             shape = raw_args[0].strip()  # Premier argument : le type de forme (carre)
-            # Deuxième argument : couleur RGB (chaîne sous forme "255,255,255")
+
+            # Deuxième argument : couleur RGB (chaîne sous forme "255, 255, 255")
             couleur_raw = raw_args[1].strip("\"")  # Enlever les guillemets autour de la couleur
-            couleur = tuple(map(int, couleur_raw.split(",")))  # Convertir en tuple d'entiers
+            couleur = tuple(map(int, map(str.strip, couleur_raw.split(","))))  # Convertir en tuple d'entiers
+
             # Troisième argument : coordonnées (x, y) sous forme "10,10"
             coordonnees_raw = raw_args[2].strip("\"")  # Enlever les guillemets autour des coordonnées
-            coordonnees = tuple(map(int, coordonnees_raw.split(",")))
+            coordonnees = tuple(map(int, map(str.strip, coordonnees_raw.split(","))))  # Convertir en tuple d'entiers
+
             # Quatrième argument : taille
             taille = int(raw_args[3])
+
             # Assigner les sous-valeurs
             x, y = coordonnees  # Extraire les coordonnées
             r, g, b = couleur   # Extraire les couleurs RGB
 
+            from code_to_insert import code_create_window, check_comment_in_code, insert_after_line
+            if check_comment_in_code(c_code, "//Create window") == 0:
+                insert_after_line(c_code, "int main() {", code_create_window)
+
             if shape == "carre" in line:
-                c_code.append("SDL_Init(SDL_INIT_VIDEO);")
-                c_code.append("SDL_Window* window = SDL_CreateWindow(\"Afficher un carré\", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 800, 600, SDL_WINDOW_SHOWN);")# Création de la fenêtre
-                c_code.append("SDL_Renderer* renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);")# Création du renderer
-                c_code.append("SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);")# Couleur de fond (noir)
-                c_code.append("SDL_RenderClear(renderer);")
-                c_code.append(f"int x = {x};        // Coordonnée x")
-                c_code.append(f"int y = {y};        // Coordonnée y")
-                c_code.append(f"int taille = {taille};   // Taille du carré")
-                c_code.append(f"int r = {r};        // Rouge")
-                c_code.append(f"int g = {g};        // Vert")
-                c_code.append(f"int b = {b};        // Bleu")
-                c_code.append("drawCarre(renderer, x, y, taille, r, g, b);")# Appel de la fonction pour dessiner un carré
-                c_code.append("SDL_RenderPresent(renderer);")# Affichage du rendu
-                c_code.append("SDL_Delay(5000);")# Pause pour visualiser le carré (5 secondes)
-                c_code.append("SDL_DestroyRenderer(renderer);")# Libération des ressources
-                c_code.append("SDL_DestroyWindow(window);")
-                c_code.append("SDL_Quit();")
-            elif shape == 'rectangle' in line: 
-                c_code.append('SDL_Init(SDL_INIT_VIDEO);  // Initialiser SDL')
-                c_code.append('SDL_Window* window = SDL_CreateWindow("Dessiner un rectangle", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 800, 600, SDL_WINDOW_SHOWN);')
-                c_code.append('SDL_Renderer* renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);')
-                c_code.append(f"int x = {x};        // Coordonnée x")
-                c_code.append(f"int y = {y};        // Coordonnée y")
-                c_code.append(f"int taille = {taille};   // Taille du carré")
-                c_code.append(f"int r = {r};        // Rouge")
-                c_code.append(f"int g = {g};        // Vert")
-                c_code.append(f"int b = {b};        // Bleu")
-                # Convertir la taille en largeur et hauteur
-                c_code.append('int largeur = (int)(taille * 0.6);   // 60% de la taille pour la largeur')
-                c_code.append('int hauteur = (int)(taille * 0.4);   // 40% de la taille pour la hauteur')
-                c_code.append('SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);  // Couleur de fond (noir)')
-                c_code.append('SDL_RenderClear(renderer);  // Effacer l\'écran')
-                c_code.append('dessinerRectangle(renderer, 200, 150, largeur, hauteur, r, g, b);')# Dessiner le rectangle
-                c_code.append('SDL_RenderPresent(renderer);  // Afficher le rendu')
-                c_code.append('SDL_Delay(5000);  // Attente 5 secondes avant de fermer')
-                # Libérer les ressources
-                c_code.append('SDL_DestroyRenderer(renderer);')
-                c_code.append('SDL_DestroyWindow(window);')
-                c_code.append('SDL_Quit();')
+                from code_to_insert import insert_after_line, code_drawCarre,check_comment_in_code
+                if check_comment_in_code(c_code, "void drawCarre") == 0:
+                    insert_after_line(c_code, "#include <stdbool.h>", code_drawCarre)
+                from code_to_insert import get_parametres_carre, insert_code_after_last_occurrence
+                parametres_carre = get_parametres_carre(x, y, taille, r, g, b)
+                if check_comment_in_code(c_code, "//Parametres carre") == 0:
+                    insert_after_line(c_code, "SDL_RenderClear(renderer);", parametres_carre)   
+                else :
+                    insert_code_after_last_occurrence(c_code, "//Fin parametres carre", parametres_carre)
+                    
+            elif shape == "rectangle" in line: 
+                from code_to_insert import insert_after_line, code_drawRectangle,check_comment_in_code
+                if check_comment_in_code(c_code, "void drawRectangle") == 0:
+                    insert_after_line(c_code, "#include <stdbool.h>", code_drawRectangle)
+                from code_to_insert import get_parametres_rectangle, insert_code_after_last_occurrence
+                parametres_rectangle = get_parametres_rectangle(x, y, taille, r, g, b)
+                if check_comment_in_code(c_code, "//Parametres rectangle") == 0:
+                    insert_after_line(c_code, "SDL_RenderClear(renderer);", parametres_rectangle)   
+                else :
+                    insert_code_after_last_occurrence(c_code, "//Fin parametres rectangle", parametres_rectangle)
+                    
+                
+            elif shape == "cercle" in line:
+                from code_to_insert import insert_after_line, code_drawCercle,check_comment_in_code
+                if check_comment_in_code(c_code, "void drawCercle") == 0:
+                    insert_after_line(c_code, "#include <stdbool.h>", code_drawCercle)
+                from code_to_insert import get_parametres_cercle, insert_code_after_last_occurrence
+                parametres_cercle = get_parametres_cercle(x, y, taille, r, g, b)
+                if check_comment_in_code(c_code, "//Parametres cercle") == 0:
+                    insert_after_line(c_code, "SDL_RenderClear(renderer);", parametres_cercle)   
+                else :
+                    insert_code_after_last_occurrence(c_code, "//Fin parametres cercle", parametres_cercle)
+                    
+            from code_to_insert import insert_code_if_comment_not_present, code_staywindow_open
+            insert_code_if_comment_not_present(c_code, code_staywindow_open, "// Garder la fenêtre ouverte en permanence avec une boucle événementielle")
+
+
+        elif line.startswith("window"):
+            pattern = r"window\s*\(\s*(\d+)\s*,\s*(\d+)\s*\)"
+            # Effectuer la correspondance avec la chaîne
+            match = re.match(pattern, line)
+            x = int(match.group(1))
+            y = int(match.group(2))
+            c_code.append(f"int x_window = {x};        // dimension fenetre x")
+            c_code.append(f"int y_window = {y};        // dimension fenetre y")
+            c_code.append("SDL_Init(SDL_INIT_VIDEO);  // Initialiser SDL")
+            c_code.append('SDL_Window* window = SDL_CreateWindow("Dessin", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, x_window, y_window, SDL_WINDOW_SHOWN);')
+            c_code.append("SDL_Renderer* renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);")
+            c_code.append("bool running = true;  // Indique si la boucle continue")
+            c_code.append("SDL_Event event;      // Événement pour capturer les actions utilisateur")
+            c_code.append("")
+            c_code.append("while (running) {")
+            c_code.append("    while (SDL_PollEvent(&event)) {")
+            c_code.append("        if (event.type == SDL_QUIT) {  // Fermer la fenêtre")
+            c_code.append("            running = false;")
+            c_code.append("        } else if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_ESCAPE) {  // Touche \"ESC\"")
+            c_code.append("            running = false;")
+            c_code.append("        }")
+            c_code.append("    }")
+            c_code.append("}")
+
+
 
         elif "=" in line:
             # Essayer de déduire le type de la variable
