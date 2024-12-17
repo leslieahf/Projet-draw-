@@ -28,7 +28,7 @@ def save_file():
 # Run Python code
 def run_code():
     code = text_area.get("1.0", tk.END)
-    with open("temp_code.py", "w") as file:
+    with open("temp_cod16e.py", "w") as file:
         file.write(code)
     result = subprocess.run(["python3", "temp_code.py"], capture_output=True, text=True)
     output_area.delete("1.0", tk.END)
@@ -74,7 +74,7 @@ toolbar_frame.pack(fill=tk.X)
 # Run button
 run_button = tk.Button(toolbar_frame, text="Run Python", command=run_code, bg="#44475a", fg="#f8f8f2", relief=tk.FLAT)
 run_button.pack(side=tk.LEFT, padx=5, pady=5)
-
+            
 # Reset button
 reset_button = tk.Button(toolbar_frame, text="Reset Editor", command=clear_editor, bg="#44475a", fg="#f8f8f2", relief=tk.FLAT)
 reset_button.pack(side=tk.LEFT, padx=5, pady=5)
@@ -145,3 +145,4 @@ run_c_button.pack(side=tk.LEFT, padx=5, pady=5)
 
 # Main loop
 root.mainloop()
+
