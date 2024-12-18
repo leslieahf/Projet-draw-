@@ -6,7 +6,7 @@ code_drawCarre = [
     "    SDL_RenderFillRect(renderer, &rect);  // Dessiner le carré",
     "}"
 ]
- 
+
 code_drawRectangle = [
     "",
     "void drawRectangle(SDL_Renderer* renderer, int x, int y, int largeur, int hauteur, int r, int g, int b) {",
@@ -15,7 +15,7 @@ code_drawRectangle = [
     "    SDL_RenderFillRect(renderer, &rect);            // Dessiner le rectangle",
     "}"
 ]
- 
+
 code_drawCercle = [
     "",
     "void drawCercle(SDL_Renderer* renderer, int cx, int cy, int rayon, int r, int g, int b) {",
@@ -29,7 +29,7 @@ code_drawCercle = [
     "    }",
     "}"
 ]
- 
+
 code_drawTriangle = [
     "void drawTriangle(SDL_Renderer* renderer, int x1, int y1, int x2, int y2, int x3, int y3, int r, int g, int b) {",
     "SDL_SetRenderDrawColor(renderer, r, g, b, 255);  // Définir la couleur du triangle",
@@ -37,16 +37,16 @@ code_drawTriangle = [
     "SDL_RenderDrawLine(renderer, x2, y2, x3, y3);    // Ligne entre le deuxième et le troisième point",
     "SDL_RenderDrawLine(renderer, x3, y3, x1, y1);  // Ligne entre le troisième et le premier point",
 "}",
- 
+
 ]
- 
+
 code_drawPolygon =[
    " void drawPolygon(SDL_Renderer* renderer, int cx, int cy, int rayon, int sides, int r, int g, int b) {",
     "SDL_SetRenderDrawColor(renderer, r, g, b, 255);",
     "double angleStep = 2 * M_PI / sides;  // Angle entre chaque sommet",
     "int x1 = cx + rayon * cos(0);        // Premier sommet",
     "int y1 = cy + rayon * sin(0);",
- 
+
     "for (int i = 1; i <= sides; i++) {",
         "int x2 = cx + rayon * cos(i * angleStep);  // Calcul du prochain sommet",
         "int y2 = cy + rayon * sin(i * angleStep);",
@@ -56,7 +56,7 @@ code_drawPolygon =[
     "}"
 "}"
 ]
- 
+
 code_drawLosange = [
     "void drawLosange(SDL_Renderer* renderer, int cx, int cy, int largeur, int hauteur, int r, int g, int b) {",
     "SDL_SetRenderDrawColor(renderer, r, g, b, 255);",
@@ -68,16 +68,16 @@ code_drawLosange = [
     "int y3 = cy + hauteur / 2;",
     "int x4 = cx - largeur / 2; // Point gauche",
     "int y4 = cy;",
- 
+
     "// Dessiner les 4 côtés",
     "SDL_RenderDrawLine(renderer, x1, y1, x2, y2);",
     "SDL_RenderDrawLine(renderer, x2, y2, x3, y3);",
     "SDL_RenderDrawLine(renderer, x3, y3, x4, y4);",
     "SDL_RenderDrawLine(renderer, x4, y4, x1, y1);",
 "}",
- 
+
 ]
- 
+
 code_drawTrapeze =[
     "void drawTrapeze(SDL_Renderer* renderer, int x, int y, int largeurHaut, int largeurBas, int hauteur, int r, int g, int b) {",
     "SDL_SetRenderDrawColor(renderer, r, g, b, 255);",
@@ -89,30 +89,24 @@ code_drawTrapeze =[
     "int y3 = y + hauteur;",
     "int x4 = x - (largeurBas - largeurHaut) / 2;              // Coin inférieur gauche",
     "int y4 = y + hauteur;",
- 
+
     "// Dessiner les côtés",
     "SDL_RenderDrawLine(renderer, x1, y1, x2, y2);",
     "SDL_RenderDrawLine(renderer, x2, y2, x3, y3);",
     "SDL_RenderDrawLine(renderer, x3, y3, x4, y4);",
     "SDL_RenderDrawLine(renderer, x4, y4, x1, y1);",
 "}",
- 
+
 ]
- 
+
 code_drawLine = [
     "",
-    "void drawLine(SDL_Renderer* renderer, int x1, int y1, int x2, int y2, int thickness, int r, int g, int b) {",
-    "    SDL_SetRenderDrawColor(renderer, r, g, b, 255);",  # Définir la couleur de la ligne",
-    "",
-    "    // Calculer la différence en x et y",
-    "    int dx = x2 - x1;",
-    "    int dy = y2 - x1;",
-    "",
-    "    // Calculer la longueur de la ligne (distance)",
-    "    double length = sqrt((dx * dx) + dy);",
-    "}"
+   "void drawLine(SDL_Renderer* renderer, int x1, int y1, int x2, int y2, int r, int g, int b) {",
+    "SDL_SetRenderDrawColor(renderer, r, g, b, 255);  // Définir la couleur de la ligne",
+    "SDL_RenderDrawLine(renderer, x1, y1, x2, y2);   // Dessiner la ligne de (x1, y1) à (x2, y2)",
+"}",
 ]
- 
+
 code_create_window = [
     "//Create window",
     "SDL_Init(SDL_INIT_VIDEO);",  # Initialiser SDL
@@ -122,7 +116,7 @@ code_create_window = [
     "SDL_RenderClear(renderer);",  # Effacer l'écran avec la couleur de fond
     ""
 ]
- 
+
 code_create_window_modify = [
     "//Create window",
     "SDL_Init(SDL_INIT_VIDEO);",  # Initialiser SDL
@@ -132,7 +126,18 @@ code_create_window_modify = [
     "SDL_RenderClear(renderer);",  # Effacer l'écran avec la couleur de fond
     ""
 ]
+
+code_create_window_fullscreen = [
+    "//Create window",
+    "SDL_Init(SDL_INIT_VIDEO);",  # Initialiser SDL
+    "SDL_Window* window = SDL_CreateWindow(\"Afficher un dessin\", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 0, 0, SDL_WINDOW_FULLSCREEN);",  # Création de la fenêtre en plein écran
+    "SDL_Renderer* renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);",  # Création du renderer
+    "SDL_SetRenderDrawColor(renderer, r_window, g_window, b_window, 255);",
+    "SDL_RenderClear(renderer);",  # Effacer l'écran avec la couleur de fond
+    ""
+]
  
+
 code_staywindow_open = [
     "// Garder la fenêtre ouverte en permanence avec une boucle événementielle",
     "SDL_RenderPresent(renderer);",  # Afficher le rendu une seule fois avant la boucle
@@ -148,15 +153,14 @@ code_staywindow_open = [
     "    }",
     "    SDL_Delay(16);  // Limiter le framerate à environ 60 FPS",
     "}",
-    "// Libérer les ressources avant de quitter",
-    "SDL_DestroyRenderer(renderer);",
-    "SDL_DestroyWindow(window);",
-    "SDL_Quit();"
+   
 ]
- 
+
+
+
 def get_parametres_carre(x, y, taille, r, g, b):
     return [
-        "{ //debut",
+        "{"
         "   // Parametres carre",    
         f"  int x_carre = {x};        // Coordonnée x",
         f"  int y_carre = {y};        // Coordonnée y",
@@ -169,10 +173,10 @@ def get_parametres_carre(x, y, taille, r, g, b):
         "}"
         ""
     ]
- 
+
 def get_parametres_rectangle(x, y, taille, r, g, b):
     return [
-        "{ //debut",
+        "{",
         "   // Parametres rectangle",
         f"   int x_rectangle = {x};        // Coordonnée x",
         f"   int y_rectangle = {y};        // Coordonnée y",
@@ -186,10 +190,10 @@ def get_parametres_rectangle(x, y, taille, r, g, b):
         "   // Fin parametres rectangle",
         "}"
     ]
- 
+
 def get_parametres_cercle(x, y, taille, r, g, b):
     return [
-        "{ //debut",
+        "{",
         "   // Parametres cercle",
         f"   int x_cercle = {x};        // Coordonnée x",
         f"   int y_cercle = {y};        // Coordonnée y",
@@ -201,10 +205,10 @@ def get_parametres_cercle(x, y, taille, r, g, b):
         "   // Fin parametres cercle",
         "}"
     ]
- 
+
 def get_parametres_triangle(x1, y1, x2, y2, x3, y3, r, g, b):
     return [
-        "{ //debut",
+        "{",
         "   // Parametres triangle",
         f"   int x1_triangle = {x1};    // Premier point (x1, y1)",
         f"   int y1_triangle = {y1};",
@@ -219,11 +223,11 @@ def get_parametres_triangle(x1, y1, x2, y2, x3, y3, r, g, b):
         "   // Fin parametres triangle",
         "}"
     ]
- 
+
 def get_parametres_polygone(cx, cy, rayon, sides, r, g, b):
     nom = {5: "pentagone", 6: "hexagone", 8: "octogone"}.get(sides, "polygone")
     return [
-        "{ //debut",
+        "{",
         f"   // Parametres {nom}",
         f"   int cx_{nom} = {cx};       // Centre X",
         f"   int cy_{nom} = {cy};       // Centre Y",
@@ -235,10 +239,10 @@ def get_parametres_polygone(cx, cy, rayon, sides, r, g, b):
         f"   // Fin parametres {nom}",
         "}"
     ]
- 
+
 def get_parametres_losange(cx, cy, largeur, hauteur, r, g, b):
     return [
-        "{ //debut",
+        "{",
         "   // Parametres losange",
         f"   int cx_losange = {cx};        // Centre X",
         f"   int cy_losange = {cy};        // Centre Y",
@@ -251,10 +255,10 @@ def get_parametres_losange(cx, cy, largeur, hauteur, r, g, b):
         "   // Fin parametres losange",
         "}"
     ]
- 
+
 def get_parametres_trapeze(x, y, largeur_haut, largeur_bas, hauteur, r, g, b):
     return [
-        "{ //debut",
+        "{",
         "   // Parametres trapèze",
         f"   int x_trapeze = {x};             // Coordonnée X du sommet supérieur gauche",
         f"   int y_trapeze = {y};             // Coordonnée Y du sommet supérieur gauche",
@@ -268,24 +272,22 @@ def get_parametres_trapeze(x, y, largeur_haut, largeur_bas, hauteur, r, g, b):
         "   // Fin parametres trapèze",
         "}"
     ]
- 
-def get_parametres_line(x1, y1, x2, y2, thickness, r, g, b):
+
+def get_parametres_line(x1, y1, x2, y2,r, g, b):
     return [
-        "{ //debut",
+        "{",
         "   // Parametres ligne",
         f"   int x1_line = {x1};        // Coordonnée x1 (départ)",
         f"   int y1_line = {y1};        // Coordonnée y1 (départ)",
         f"   int x2_line = {x2};        // Coordonnée x2 (fin)",
         f"   int y2_line = {y2};        // Coordonnée y2 (fin)",
-        f"   int thickness_line = {thickness};  // Épaisseur de la ligne",
         f"   int r_line = {r};          // Rouge",
         f"   int g_line = {g};          // Vert",
         f"   int b_line = {b};          // Bleu",
-        "   drawLine(renderer, x1_line, y1_line, x2_line, y2_line, thickness_line, r_line, g_line, b_line);",  # Appel à la fonction pour dessiner la ligne
+        "   drawLine(renderer, x1_line, y1_line, x2_line, y2_line,r_line, g_line, b_line);",  # Appel à la fonction pour dessiner la ligne
         "   // Fin parametres ligne",
         "}"
     ]
- 
 def extract_window_params(arguments):
     raw_args = split_arguments(arguments)
     coordonnees_raw = raw_args[0].strip("\"")  # Enlever les guillemets autour du premier argument
@@ -296,7 +298,6 @@ def extract_window_params(arguments):
     r, g, b = couleur  # Extraire les couleurs RGB
  
     return coordonnees, x, y, r, g, b
-
 def get_parametres_window(x, y, r, g, b):
     return [
         "   //Parametres window",    
@@ -308,79 +309,14 @@ def get_parametres_window(x, y, r, g, b):
         "   // Fin parametres window",
         ""
     ]
-
 def remove_lines_after_keyword(c_code, keyword, nb_lines_to_remove):
     if keyword in c_code:
         start_index = c_code.index(keyword)
         end_index = start_index + nb_lines_to_remove
         del c_code[start_index:end_index]
     else :
-        c_code.append("probleme gros")
+        c_code.append("frere c'est pas supprime chacal")
     return c_code
-  
-def insert_after_line(c_code, target_line, code_to_insert):
-        # Trouver l'index de la ligne cible
-        index = next((i for i, line in enumerate(c_code) if line == target_line), -1)
- 
-        if index != -1:  # Si la ligne cible est trouvée
-            # Ajouter le code à insérer juste après cette ligne
-            c_code[index+1:index+1] = code_to_insert
-        else:
-            print("erreur")
- 
-def insert_code_if_comment_not_present(c_code, code_to_insert, comment_variable):
-    # Vérifier si le comment_variable est déjà présent dans c_code
-    comment_present = False
-    for line in c_code:
-        if comment_variable in line:
-            comment_present = True
-            break
-    
-    # Si le comment_variable n'est pas présent, ajouter le code
-    if not comment_present:
-        c_code.extend(code_to_insert)
- 
-def check_comment_in_code(c_code, comment_variable):
-    for line in c_code:
-        if comment_variable in line:
-            return 1  # Si le commentaire est trouvé, retourne 1
-    return 0  # Si le commentaire n'est pas trouvé, retourne 0
- 
-def insert_code_after_last_occurrence(c_code, target_line, code_to_add):
-    # Rechercher la dernière occurrence du mot de recherche
-    last_index = -1
-    for i, line in enumerate(c_code):
-        if target_line in line:
-            last_index = i  # Sauvegarder l'indice de la dernière occurrence
-    
-    # Si on n'a pas trouvé de dernière occurrence, afficher un message d'erreur
-    if last_index == -1:
-        print(f"Erreur : '{target_line}' n'a pas été trouvé dans le code.")
-        return
- 
-    # Si on a trouvé la dernière occurrence, on ajoute le code après cette ligne
-    c_code.insert(last_index + 1, code_to_add)
-    print(f"Code ajouté après la ligne : {last_index}")
- 
-def split_arguments(argument_string):
-    """Divise une chaîne d'arguments en morceaux tout en respectant les guillemets et les virgules."""
-    args = []
-    current = ""
-    in_quotes = False  # Flag pour savoir si on est à l'intérieur de guillemets
-    for char in argument_string:
-        if char == "\"":  # Toggle l'état des guillemets
-            in_quotes = not in_quotes
-        elif char == "," and not in_quotes:
-            # Si on rencontre une virgule hors des guillemets, on termine un argument
-            args.append(current.strip())
-            current = ""
-        else:
-            current += char
-    # Ajouter le dernier argument
-    if current:
-        args.append(current.strip())
-    return args
-
 def insert_code_before_first_occurrence(c_code, target_line, code_to_add):
     for i, line in enumerate(c_code):
         if target_line in line:
@@ -393,6 +329,85 @@ def insert_code_before_first_occurrence(c_code, target_line, code_to_add):
             break  # Arrêter après avoir inséré
     return c_code
 
+
+
+
+def insert_after_line(c_code, target_line, code_to_insert):
+        # Trouver l'index de la ligne cible
+        index = next((i for i, line in enumerate(c_code) if line == target_line), -1)
+
+        if index != -1:  # Si la ligne cible est trouvée
+            # Ajouter le code à insérer juste après cette ligne
+            c_code[index+1:index+1] = code_to_insert
+        else:
+            print("erreur")
+
+def insert_after_previous_line(c_code, code_to_insert):
+    """
+    Insère un bloc de code juste après la dernière ligne du code présent.
+
+    Args:
+        c_code (list of str): Liste des lignes du code C.
+        code_to_insert (list of str): Bloc de code à insérer sous forme de liste de lignes.
+
+    Returns:
+        None
+    """
+    # Ajouter le code à insérer juste à la fin de la liste des lignes existantes
+    c_code.extend(code_to_insert)
+    
+def insert_code_if_comment_not_present(c_code, code_to_insert, comment_variable):
+    # Vérifier si le comment_variable est déjà présent dans c_code
+    comment_present = False
+    for line in c_code:
+        if comment_variable in line:
+            comment_present = True
+            break
+    
+    # Si le comment_variable n'est pas présent, ajouter le code
+    if not comment_present:
+        c_code.extend(code_to_insert)
+
+def check_comment_in_code(c_code, comment_variable):
+    for line in c_code:
+        if comment_variable in line:
+            return 1  # Si le commentaire est trouvé, retourne 1
+    return 0  # Si le commentaire n'est pas trouvé, retourne 0
+
+def insert_code_after_last_occurrence(c_code, target_line, code_to_add):
+    # Rechercher la dernière occurrence du mot de recherche
+    last_index = -1
+    for i, line in enumerate(c_code):
+        if target_line in line:
+            last_index = i  # Sauvegarder l'indice de la dernière occurrence
+    
+    # Si on n'a pas trouvé de dernière occurrence, afficher un message d'erreur
+    if last_index == -1:
+        print(f"Erreur : '{target_line}' n'a pas été trouvé dans le code.")
+        return
+
+    # Si on a trouvé la dernière occurrence, on ajoute le code après cette ligne
+    c_code.insert(last_index + 1, code_to_add)
+    print(f"Code ajouté après la ligne : {last_index}")
+ # Diviser les arguments intelligemment en tenant compte des guillemets
+def split_arguments(argument_string):
+                """Divise une chaîne d'arguments en morceaux tout en respectant les guillemets et les virgules."""
+                args = []
+                current = ""
+                in_quotes = False  # Flag pour savoir si on est à l'intérieur de guillemets
+                for char in argument_string:
+                    if char == "\"":  # Toggle l'état des guillemets
+                        in_quotes = not in_quotes
+                    elif char == "," and not in_quotes:
+                        # Si on rencontre une virgule hors des guillemets, on termine un argument
+                        args.append(current.strip())
+                        current = ""
+                    else:
+                        current += char
+                # Ajouter le dernier argument
+                if current:
+                    args.append(current.strip())
+                return args
 def insert_after_line_2x(c_code, target_line, code_to_insert_1, code_to_insert_2):
     # Trouver l'index de la ligne cible
     index = next((i for i, line in enumerate(c_code) if line == target_line), -1)
