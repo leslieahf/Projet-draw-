@@ -196,11 +196,12 @@ def translate_to_c(draw_code):
             c_code.append(f"    {re.sub(r'\bprint\b', 'printf', line)};")
         else:
             c_code.append(f"    {line}")  # Laisser la ligne telle quelle, avec indentation
-        from code_to_insert import insert_code_if_comment_not_present, code_staywindow_open
-        insert_code_if_comment_not_present(c_code, code_staywindow_open, "// Garder la fenêtre ouverte en permanence avec une boucle événementielle")
+
+    from code_to_insert import insert_code_if_comment_not_present, code_staywindow_open
+    insert_code_if_comment_not_present(c_code, code_staywindow_open, "// Garder la fenêtre ouverte en permanence avec une boucle événementielle")
         
-        c_code.append("    return 0;")
-        c_code.append("}")  # Fin de la fonction main
+    c_code.append("    return 0;")
+    c_code.append("}")  # Fin de la fonction main
  
         # Retourner le code complet C avec le main inclus
-        return "\n".join(c_code)
+    return "\n".join(c_code)
