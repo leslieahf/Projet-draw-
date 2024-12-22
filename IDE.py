@@ -1,4 +1,5 @@
 import tkinter as tk
+import syntaxe
 from tkinter import filedialog, scrolledtext, messagebox
 import subprocess
 import translate_to_c
@@ -6,7 +7,7 @@ from pygments import lex
 from pygments.lexers import PythonLexer
 from pygments.token import Token
  
-# Main window
+
 root = tk.Tk()
 root.title("IDE DRAW++")
  
@@ -75,6 +76,13 @@ update_line_numbers()
 def generate_and_run_c_code():
     # Translate DRAW++ code to C
     draw_code = text_area.get("1.0", tk.END)  # Get the text from the editor
+    errors = syntaxe.validate_syntax(draw_code)
+    if errors:
+        output_area.delete("1.0", tk.END)
+        output_area.insert(tk.END, "Syntax errors found:\n")
+        output_area.insert(tk.END, "\n".join(errors))
+        return
+
     c_code = translate_to_c.translate_to_c(draw_code)
     
     # Save the translated C code into a file
