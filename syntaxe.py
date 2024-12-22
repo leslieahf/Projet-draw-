@@ -43,28 +43,30 @@ COMMAND_PATTERNS = {
     "function_call": r"^[a-zA-Z_][a-zA-Z0-9_]*\([\w,\s]*\)$",  # Ex: my_function(10, "test")
 }
 
-RESERVED_KEYWORDS = {"print", "input", "true", "false", "draw_line", "draw_circle", "draw_rectangle", "set_color", "set_line_width", "window"}
-
 def validate_additional_rules(lines):
     errors = []
-    symbol_table = {}
+    symbol_table = {}  # Pour stocker les variables initialisées
 
     for i, line in enumerate(lines, start=1):
         # Vérification de l'initialisation des variables
-        match_init = re.match(r"^([a-zA-Z_][a-zA-Z0-9_]*)\s*<-\s*", line)
+        match_init = re.match(r"^([a-zA-Z_][a-zA-Z0-9_]*)\s*<-\s*.*", line)
         if match_init:
             variable_name = match_init.group(1)
-            symbol_table[variable_name] = True
+            symbol_table[variable_name] = True  # La variable est marquée comme initialisée
 
-        # Vérification de l'utilisation des variables
-        variables = re.findall(r"[a-zA-Z_][a-zA-Z0-9_]*", line)
-        for variable in variables:
+        # Extraction des mots potentiellement des variables
+        tokens = re.findall(r"[a-zA-Z_][a-zA-Z0-9_]*", line)
+        for token in tokens:
+            # Vérifier si c'est un appel de fonction (suivi de parenthèses)
+            if re.search(rf"{re.escape(token)}\s*\(", line):
+                continue  # Considéré comme un appel de fonction légitime
+
+            # Vérifier si le token est une variable non initialisée
             if (
-                variable not in symbol_table  # Non initialisée
-                and variable not in RESERVED_KEYWORDS  # Pas un mot-clé réservé
-                and not re.match(r"(true|false|\d+(\.\d+)?)", variable)  # Pas une constante ou un littéral
+                token not in symbol_table  # Si la variable n'est pas initialisée
+                and not re.match(r"(true|false|[-+]?\d+(\.\d+)?|\".*\"|'.*')", token)  # Pas un littéral
             ):
-                errors.append(f"Ligne {i}: Variable '{variable}' utilisée sans être initialisée.")
+                errors.append(f"Ligne {i}: Variable '{token}' utilisée sans être initialisée.")
 
         # Vérification de la division par zéro
         if re.search(r"/\s*0", line):
@@ -78,6 +80,7 @@ def validate_additional_rules(lines):
             errors.append(f"Ligne {i}: Opérations arithmétiques non valides entre booléens.")
 
     return errors
+
 
 def validate_syntax(draw_code):
     """

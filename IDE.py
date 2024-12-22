@@ -81,6 +81,7 @@ def generate_and_run_c_code():
         output_area.delete("1.0", tk.END)
         output_area.insert(tk.END, "Syntax errors found:\n")
         output_area.insert(tk.END, "\n".join(errors))
+        output_area.insert(tk.END, "\n\nExecution aborted due to syntax errors.")
         return
 
     c_code = translate_to_c.translate_to_c(draw_code)
