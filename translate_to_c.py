@@ -1,11 +1,22 @@
 import re
 
 def get_printf_format_and_cast(variable, symbol_table):
+    # Si le variable est un littéral string
     if (variable.startswith('"') and variable.endswith('"')) or (variable.startswith("'") and variable.endswith("'")):
-        return "%s", variable  # On retourne directement le littéral
+        return "%s", variable  # Retourne directement le littéral
 
+    # Si la variable est une constante numérique
+    if re.match(r'^[-+]?\d+(\.\d+)?$', variable):
+        return "%d" if "." not in variable else "%f", variable
+
+    # Si la variable est une booléenne
+    if variable in {"true", "false"}:
+        return "%d", f"({variable} ? 1 : 0)"  # true -> 1, false -> 0
+
+    # Vérifier si la variable est déclarée dans le symbol_table
     if variable not in symbol_table:
-        raise ValueError(f"Error: Variable '{variable}' is used but not declared.")
+        raise ValueError(f"Variable '{variable}' not declared.")
+
     var_type = symbol_table[variable]["type"]
     if var_type == "int":
         return "%d", variable
@@ -14,9 +25,9 @@ def get_printf_format_and_cast(variable, symbol_table):
     elif var_type == "bool":
         return "%d", f"({variable} ? 1 : 0)"
     elif var_type == "string":
-        return "%s", variable
+        return "%s", f"&{variable}"  # Ajout de & pour les strings
     else:
-        raise ValueError(f"Error: Unknown type for variable '{variable}'.")
+        raise ValueError(f"Unknown type for variable '{variable}'.")
 
 def translate_to_c(draw_code):
     symbol_table = {}
@@ -41,19 +52,12 @@ def translate_to_c(draw_code):
 
     def translate_print(match):
         variable = match.group(1).strip()
-        # Vérifier si c'est un littéral string (entre guillemets simples ou doubles)
-        if (variable.startswith('"') and variable.endswith('"')) or (variable.startswith("'") and variable.endswith("'")):
-        # Retourner directement le printf avec le littéral
-            return f'printf({variable});'
-
-    # Si ce n'est pas un littéral, vérifier dans le symbol_table
-        if variable not in symbol_table:
-            raise ValueError(f"Variable '{variable}' not declared.")
-    
-        var_type = symbol_table[variable]
-        format_specifier = {"int": "%d", "float": "%f", "bool": "%d", "string": "%s"}.get(var_type, "%s")
-        return f'printf("{format_specifier}\\n", {variable});'
-    
+        try:
+            format_specifier, casted_variable = get_printf_format_and_cast(variable, symbol_table)
+            return f'printf("{format_specifier}\\n", {casted_variable});'
+        except ValueError as e:
+            raise ValueError(f"Error translating print statement: {e}")
+        
     # Séparer le code en lignes
     lines = draw_code.split("\n")
     
