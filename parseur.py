@@ -53,6 +53,8 @@ class Parser:
                 ast.append(self.parse_assignment())
             elif token.type == "NUMBER":
                 raise SyntaxError(f"Unexpected '{token.value}' at line {token.line}. Did you forget an assignment?")
+            if token.type == "DRAW_COMMAND" :
+                ast.append(self.parse_draw_command())
             elif token.type == "PRINT":
                 ast.append(self.parse_print())
             elif token.type == "IF":
@@ -129,6 +131,9 @@ class Parser:
         while self.current_index < len(self.tokens) and self.tokens[self.current_index].type not in {"NEWLINE", "RBRACE", "RPAREN", "SEMICOLON", "COMMA"} :
             if self.current_index >= len(self.tokens):
                 break
+            if self.current_index + 1 >= len(self.tokens):
+                return None
+
             token = self.tokens[self.current_index]
             if stop_at_newline and token.line != current_line:
                 break
@@ -189,7 +194,6 @@ class Parser:
                             raise SyntaxError(f"Invalid operation! Division by 0 at line {token.line}")
                     else:
                         raise SyntaxError(f"Invalid syntax: Missing operand for division at line {token.line}")
-
                     
             if token.type == "COMPARAISON":      
                 valid_contexts = {"IF", "WHILE", "FOR", "ELIF"}  # Contextes autorisés pour une comparaison
@@ -215,19 +219,12 @@ class Parser:
 
         if self.current_index >= len(self.tokens) or self.tokens[self.current_index].type != "RPAREN":
             raise SyntaxError(f"Expected ')' after print expression at line {token.line}")
-
-        for tok in expression:
-            k = 0
-            if tok.type == "WHITESPACE":
-                k += 1
-                tok += 1
-
-        if k == len(expression):
-             raise SyntaxError(f"Missing arguments in print expression at line {token.line}")
+        
+        # Validation des variables dans le print
+        if len(expression) == 0 or all(tok.type == "WHITESPACE" for tok in expression):
+            raise SyntaxError(f"Missing arguments in print expression at line {token.line}")
 
         self.current_index += 1
-
-        # Validation des variables dans le print
         for tok in expression:
             if tok.type == "VARIABLE" and tok.value not in self.symbol_table:
                 raise SyntaxError(f"'{tok.value}' used without being initialized at line {tok.line}")
@@ -274,8 +271,15 @@ class Parser:
         self.skip_whiteline()
 
         # Parse le corps du bloc
-        body = self.parse()
+        body = []
+        while self.current_index < len(self.tokens) and self.tokens[self.current_index].type != "RBRACE":
+            body.append(self.parse())
+            self.skip_whiteline()
 
+        if self.current_index >= len(self.tokens) or self.tokens[self.current_index].type != "RBRACE":
+            raise SyntaxError(f"Expected '}}' after while condition at line {token.line}")
+        self.current_index +=1
+        self.skip_whiteline()
         self.current_context = None
         return {"type": "if", "condition": self.tokens_to_string(condition), "body": body}
 
@@ -284,14 +288,15 @@ class Parser:
         Parse the expressions specific to a for loop, including initialization, condition, and increment.
         Returns a dictionary with parsed parts of the for loop.
         """
+        
         init = self.parse_expression(stop_at_newline=False)
         print(self.current_index)        
         self.skip_only_whitespace()
             
         if self.current_index  >= len(self.tokens) or self.tokens[self.current_index].type != "SEMICOLON":
             raise SyntaxError(f"Expected ';' after initialization at line {self.tokens[self.current_index].line}")
-        self.current_index += 1
-
+        
+        self.skip_only_whitespace()
         condition = self.parse_expression(stop_at_newline=False)
 
         self.skip_only_whitespace()
@@ -340,7 +345,15 @@ class Parser:
         self.current_index += 1
         self.skip_whiteline()
         # Parse le corps du bloc
-        body = self.parse()
+        body = []
+        while self.current_index < len(self.tokens) and self.tokens[self.current_index].type != "RBRACE":
+            body.append(self.parse())
+            self.skip_whiteline()
+
+        if self.current_index >= len(self.tokens) or self.tokens[self.current_index].type != "RBRACE":
+            raise SyntaxError(f"Expected '}}' after while condition at line {token.line}")
+        self.current_index +=1
+        self.skip_whiteline()
         
         self.current_context = None
         return {
@@ -394,7 +407,7 @@ class Parser:
             raise SyntaxError(f"Expected '}}' after while condition at line {token.line}")
         self.current_index +=1
         self.skip_whiteline()
-
+        self.current_context = None
         return {"type": "while", "condition": self.tokens_to_string(condition), "body": body}
 
     def parse_draw_command(self):
