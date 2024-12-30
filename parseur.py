@@ -131,9 +131,6 @@ class Parser:
         while self.current_index < len(self.tokens) and self.tokens[self.current_index].type not in {"NEWLINE", "RBRACE", "RPAREN", "SEMICOLON", "COMMA"} :
             if self.current_index >= len(self.tokens):
                 break
-            if self.current_index + 1 >= len(self.tokens):
-                return None
-
             token = self.tokens[self.current_index]
             if stop_at_newline and token.line != current_line:
                 break
@@ -286,38 +283,40 @@ class Parser:
     def parse_for_expression(self):
         """
         Parse the expressions specific to a for loop, including initialization, condition, and increment.
+        Handles cases like `for(;;)` where expressions are empty.
         Returns a dictionary with parsed parts of the for loop.
         """
-        
-        init = self.parse_expression(stop_at_newline=False)
-        print(self.current_index)        
-        self.skip_only_whitespace()
-            
-        if self.current_index  >= len(self.tokens) or self.tokens[self.current_index].type != "SEMICOLON":
-            raise SyntaxError(f"Expected ';' after initialization at line {self.tokens[self.current_index].line}")
-        
-        self.skip_only_whitespace()
-        condition = self.parse_expression(stop_at_newline=False)
+        init, condition, increment = None, None, None
 
+        # Parse initialization
+        if self.current_index < len(self.tokens) and self.tokens[self.current_index].type != "SEMICOLON":
+            init = self.parse_expression(stop_at_newline=False)
         self.skip_only_whitespace()
+
         if self.current_index >= len(self.tokens) or self.tokens[self.current_index].type != "SEMICOLON":
-            raise SyntaxError(f"Expected ';' after condition at line {self.tokens[self.current_index].line}")
-        self.current_index += 1
+            raise SyntaxError(f"Expected ';' after initialization at line {self.tokens[self.current_index - 1].line}")
+        self.current_index += 1  # Skip ';'
 
-        for tok in condition:
-            if tok.type == "VARIABLE" and tok.value not in self.symbol_table:
-                raise SyntaxError(f"'{tok.value}' used without being initialized at line {tok.line}")
-        for tok in init:
-            if tok.type == "VARIABLE" and tok.value not in self.symbol_table:
-                raise SyntaxError(f"'{tok.value}' used without being initialized at line {tok.line}")
-            
-        increment = self.parse_expression(stop_at_newline=False)
+        # Parse condition
+        if self.current_index < len(self.tokens) and self.tokens[self.current_index].type != "SEMICOLON":
+            condition = self.parse_expression(stop_at_newline=False)
         self.skip_only_whitespace()
+
+        if self.current_index >= len(self.tokens) or self.tokens[self.current_index].type != "SEMICOLON":
+            raise SyntaxError(f"Expected ';' after condition at line {self.tokens[self.current_index - 1].line}")
+        self.current_index += 1  # Skip ';'
+
+        # Parse increment
+        if self.current_index < len(self.tokens) and self.tokens[self.current_index].type != "RPAREN":
+            increment = self.parse_expression(stop_at_newline=False)
+        self.skip_only_whitespace()
+
         return {
-            "initialization": self.tokens_to_string(init),
-            "condition": self.tokens_to_string(condition),
-            "increment": self.tokens_to_string(increment),
+            "initialization": self.tokens_to_string(init) if init else None,
+            "condition": self.tokens_to_string(condition) if condition else None,
+            "increment": self.tokens_to_string(increment) if increment else None,
         }
+
 
     def parse_for(self):
         self.current_context = "FOR"
