@@ -32,8 +32,8 @@ def get_printf_format_and_cast(variable, symbol_table):
 def translate_to_c(draw_code):
     symbol_table = {}
     draw_code = draw_code.replace(" <- ", " = ").replace(" eq ", " == ").replace(" neq ", " != ")
-    draw_code = draw_code.replace("&", "&&").replace(" OR ", " || ").replace("true", "1").replace("false", "0")
-
+    draw_code = draw_code.replace("and", "&&").replace(" or ", " || ").replace("true", "1").replace("false", "0")
+    draw_code = draw_code.replace("<", "infs").replace(" <= ", " inf ").replace(">", "sups").replace(">=", "sup")
     def track_variable(line):
         match = re.match(r'^([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*(.+)$', line)
         if match:
