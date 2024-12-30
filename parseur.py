@@ -1,10 +1,36 @@
 from tok import Lexer
+from difflib import get_close_matches
+
+class GrammarAnalyzer:
+    def __init__(self):
+        self.valid_tokens = {
+            "print()": ["prin()", "prit()", "printf()"],
+            "=": ["<-"],
+            "==": ["eq"],
+            ">": ["sup", "sups"],
+            ">=": ["sup", "sups"],
+            "<": ["inf", "infs"],
+            "<=": ["inf", "infs"],
+        }
+
+    def analyse(self, token_value):
+        suggestions = []
+        for valid_token, alternatives in self.valid_tokens.items():
+            all_alternatives = [valid_token] + alternatives
+            matches = get_close_matches(token_value, all_alternatives, n=1, cutoff=0.6)
+            if matches:
+                suggestions.append(f"Did you mean '{matches[0]}' instead of '{token_value}'?")
+        if suggestions:
+            return suggestions
+        else:
+            return [f"No suggestion found for '{token_value}'."]
 
 class Parser:
     def __init__(self, tokens):
         self.tokens = tokens
         self.current_index = 0
         self.symbol_table = {}  # Stocke les variables initialisées
+        self.analyzer = GrammarAnalyzer()  # Instance de l’analyzer
         self.current_context = None
 
     def parse(self):
@@ -17,7 +43,12 @@ class Parser:
                 break
             token = self.tokens[self.current_index]
             print(f"DEBUG: Token actuel : {token}")
-
+            """
+            #Vérification des tokens inconnus
+            if token.type not in {"VARIABLE", "NUMBER", "PRINT", "IF", "WHILE", "FOR", "OPERATOR", "COMPARAISON", "DRAW_COMMAND", "ASSIGN", "LPAREN", "RPAREN", "LBRACE", "RBRACE"}:
+                suggestions = self.analyzer.analyse(token.value)
+                raise SyntaxError(f"Unknown token '{token.value}' at line {token.line}. Suggestions: {', '.join(suggestions)}")
+            """
             if token.type == "VARIABLE":
                 ast.append(self.parse_assignment())
             elif token.type == "NUMBER":
@@ -95,7 +126,7 @@ class Parser:
     def parse_expression(self, stop_at_newline=False):
         expression = []
         current_line = self.tokens[self.current_index].line
-        while self.current_index < len(self.tokens) and (self.tokens[self.current_index].type not in {"NEWLINE", "RBRACE", "RPAREN", "SEMICOLON", "COMMA"} or self.tokens[self.current_index + 1] is None):
+        while self.current_index < len(self.tokens) and self.tokens[self.current_index].type not in {"NEWLINE", "RBRACE", "RPAREN", "SEMICOLON", "COMMA"} :
             if self.current_index >= len(self.tokens):
                 break
             token = self.tokens[self.current_index]
@@ -205,7 +236,6 @@ class Parser:
             "type": "print",
             "expression": self.tokens_to_string(expression),
         }
-
     def parse_if(self):
         self.current_context = "IF"
         token = self.tokens[self.current_index]
@@ -244,7 +274,7 @@ class Parser:
         self.skip_whiteline()
 
         # Parse le corps du bloc
-        body = self.parse_block()
+        body = self.parse()
 
         self.current_context = None
         return {"type": "if", "condition": self.tokens_to_string(condition), "body": body}
@@ -284,7 +314,6 @@ class Parser:
             "increment": self.tokens_to_string(increment),
         }
 
-    
     def parse_for(self):
         self.current_context = "FOR"
         token = self.tokens[self.current_index]
@@ -311,7 +340,7 @@ class Parser:
         self.current_index += 1
         self.skip_whiteline()
         # Parse le corps du bloc
-        body = self.parse_block()
+        body = self.parse()
         
         self.current_context = None
         return {
@@ -348,8 +377,7 @@ class Parser:
         for tok in condition:
             if tok.type == "VARIABLE" and tok.value not in self.symbol_table:
                 raise SyntaxError(f"'{tok.value}' used without being initialized at line {tok.line}")
-        
-
+    
         if self.current_index >= len(self.tokens) or self.tokens[self.current_index].type != "LBRACE":
             raise SyntaxError(f"Expected '{{' after while condition at line {token.line}")
 
@@ -357,9 +385,16 @@ class Parser:
         self.skip_whiteline()
 
         # Parse le corps du bloc
-        body = self.parse_block()
-    
-        self.current_context = None
+        body = []
+        while self.current_index < len(self.tokens) and self.tokens[self.current_index].type != "RBRACE":
+            body.append(self.parse())
+            self.skip_whiteline()
+
+        if self.current_index >= len(self.tokens) or self.tokens[self.current_index].type != "RBRACE":
+            raise SyntaxError(f"Expected '}}' after while condition at line {token.line}")
+        self.current_index +=1
+        self.skip_whiteline()
+
         return {"type": "while", "condition": self.tokens_to_string(condition), "body": body}
 
     def parse_draw_command(self):
@@ -392,37 +427,4 @@ class Parser:
             print(f"Error converting tokens to string: {e}")
             raise
         
-    def parse_block(self):
-        block = []
-        brace_stack = ['{']  # Pile pour suivre les accolades ouvrantes
-        
-        while self.current_index < len(self.tokens):
-            self.skip_whiteline()  
-            if self.current_index >= len(self.tokens):
-                break
-
-            token = self.tokens[self.current_index]
-
-            # Vérifie si une accolade fermante est atteinte
-            if token.type == "RBRACE":
-                if not brace_stack:
-                    raise SyntaxError(f"Unexpected '}}' at line {token.line}.")
-                brace_stack.pop()  # Retire une accolade ouvrante correspondante
-                self.current_index += 1  # Skip RBRACE
-                break
-
-            # Vérifie si une accolade ouvrante est rencontrée
-            if token.type == "LBRACE":
-                brace_stack.append("{")  # Ajoute une accolade ouvrante à la pile
-                self.current_index += 1  # Passe l'accolade ouvrante
-                block.append(self.parse_block())  # Traite le sous-bloc
-                continue
-
-            # Traite les instructions dans le bloc
-           
-        # Vérifie si des accolades ouvrantes n'ont pas été fermées
-        if brace_stack:
-            raise SyntaxError("Missing closing '}' for an opened block.")
-        return block
-
             

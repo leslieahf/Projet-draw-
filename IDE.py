@@ -73,7 +73,23 @@ output_area.pack(fill=tk.BOTH, expand=True)
 # Update line numbers every 100 ms
 update_line_numbers()
 
-# Function to generate and execute C code
+
+def highlight_error(line_number, column_start, column_end):
+    """
+    Souligne en rouge une portion spécifique dans le Text Widget.
+    :param line_number: Numéro de la ligne où l'erreur est détectée.
+    :param column_start: Début de la colonne où l'erreur commence.
+    :param column_end: Fin de la colonne où l'erreur termine.
+    """
+    text_area.tag_remove("error", "1.0", tk.END)  # Supprime les anciens soulignages
+    start_index = f"{line_number}.{column_start}"
+    end_index = f"{line_number}.{column_end}"
+    text_area.tag_add("error", start_index, end_index)  # Ajoute le soulignage rouge
+    text_area.tag_config("error", underline = 1, foreground="#E57373")  # Configure le style
+
+
+
+# Mise à jour de la fonction principale
 def generate_and_run_c_code():
     draw_code = text_area.get("1.0", tk.END).strip()  # Récupère le code de l'éditeur
 
@@ -82,7 +98,19 @@ def generate_and_run_c_code():
     if errors:
         output_area.delete("1.0", tk.END)
         output_area.insert(tk.END, "Erreurs détectées :\n")
-        output_area.insert(tk.END, "\n".join(errors))
+        for error in errors:
+            output_area.insert(tk.END, f"{error}\n")
+
+            # Extraction du numéro de ligne et suggestion (si applicable)
+            if "line" in error:
+                try:
+                    line_number = int(error.split("line")[1].split()[0])
+                    # Surligne la ligne de l'erreur
+                    column_start = 0
+                    column_end = len(draw_code.split("\n")[line_number - 1])
+                    highlight_error(line_number, column_start, column_end)
+                except (ValueError, IndexError):
+                    pass  # Ignore si une erreur se produit dans l'analyse
         output_area.insert(tk.END, "\n\nExécution annulée.")
         return
 
@@ -116,7 +144,6 @@ def generate_and_run_c_code():
     except Exception as e:
         output_area.delete("1.0", tk.END)
         output_area.insert(tk.END, f"Erreur lors de la traduction ou exécution : {str(e)}\n\nExécution annulée.")
-
 
 # Add Generate and Run button
 run_button = tk.Button(root, text="Run draw code", command=generate_and_run_c_code, bg="#44475a", fg="#f8f8f2", relief=tk.FLAT)
