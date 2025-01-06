@@ -12,12 +12,18 @@ class Token:
 
 class Lexer:
     TOKEN_SPECIFICATIONS = [
+        ("WHITESPACE", r"[ \t]+"),
+        ("NEWLINE", r"\n"),
         ("PRINT", r"print"),
         ("IF", r"if"),
         ("WHILE", r"while"),
         ("FOR", r"for"),
         ("SEMICOLON", r";"),
         ("COMMA", r","),
+        ("FUNCTION_DECLARATION", r"func"),
+        ("RETURN", r"return"),
+        ("VARIABLE_DEF", r"(int|float|str|bool)"),  
+        ("FUNCTION_CALL", r"call"),
         ("DRAW_COMMAND", r"draw_line|draw_circle|draw_rectangle"),
         ("NUMBER", r"\d+(\.\d+)?"),
         ("STRING", r'"[^"]*"|\'[^\']*\''),
@@ -29,8 +35,6 @@ class Lexer:
         ("RPAREN", r"\)"),
         ("LBRACE", r"\{"),
         ("RBRACE", r"\}"),
-        ("WHITESPACE", r"[ \t]+"),
-        ("NEWLINE", r"\n"),
     ]
 
     def __init__(self, code):
