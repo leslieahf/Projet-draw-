@@ -126,7 +126,7 @@ def generate_and_run_c_code():
         with open("generated_program.c", "w") as file:
             file.write(c_code)
 
-        compile_command = ["gcc", "generated_program.c", "-o", "generated_program", "-lSDL2", "-lm"]
+        compile_command = ["gcc", "generated_program.c", "-o", "generated_program", "-lSDL2", "-lSDL2_ttf" ,"-lm"]
         result = subprocess.run(compile_command, capture_output=True, text=True)
 
         if result.returncode == 0:
