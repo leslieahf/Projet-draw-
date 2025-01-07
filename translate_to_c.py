@@ -77,6 +77,10 @@ def translate_to_c(draw_code):
             c_code.append(f"    {line}")  # Ajouter avec une indentation de 4 espaces
             # Si c'est une affectation ou une déclaration, on ajoute un point-virgule pour C
        
+        elif line.startswith("freedraw"):
+            code_to_insert.insert_after_line(c_code,"#include <math.h>", code_to_insert.code_instructions_freedraw)
+            code_to_insert.insert_after_line(c_code, "int main() {", code_to_insert.code_mainProgram_freedraw)
+            
         elif line.startswith("draw"):
             # Extraire les informations entre les parenthèses
             arguments = line[line.find("(") + 1: line.rfind(")")]
