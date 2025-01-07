@@ -121,40 +121,61 @@ class Parser:
 
     def parse_assignment(self):
         token = self.tokens[self.current_index]
-        variable_name = token.value
-        
+        variable_name = token.value  # Extract the variable name
+    
         self.current_index += 1
         self.skip_only_whitespace()
 
-        if  self.current_index >= len(self.tokens) or self.tokens[self.current_index].type != "ASSIGN":
+        # Check for assignment operator `<-`
+        if self.current_index >= len(self.tokens) or self.tokens[self.current_index].type != "ASSIGN":
             raise SyntaxError(f"Expected '<-' after {variable_name} at line {token.line}")
-        
+    
         self.current_index += 1
         self.skip_only_whitespace()
 
-
-        if self.current_index >= len(self.tokens) or self.tokens[self.current_index] is None :
-            raise SyntaxError(f"Expected value after VARIABLE at line {token.line}")
-        
+        # Check for value after the assignment operator
+        if self.current_index >= len(self.tokens) or self.tokens[self.current_index] is None:
+            raise SyntaxError(f"Expected value after '<-' at line {token.line}")
+        # Parse the expression on the right-hand side
         expression = self.parse_expression(stop_at_newline=True)
-        # Validation des variables utilisées dans l'expression
-        for tok in expression:
-            if tok.type == "VARIABLE" and tok.value == variable_name:
-                # Vérifie si la variable est référencée dans sa propre affectation sans être initialisée auparavant
-                if variable_name not in self.symbol_table:
-                    raise SyntaxError(f"{variable_name}' used in its own initialization before being initialized at line {tok.line}")
-                
-            if tok.type == "VARIABLE" and tok.value not in self.symbol_table:
-                    raise SyntaxError(f"'{tok.value}' used without being initialized at line {tok.line}")
-        
-        self.symbol_table[variable_name] = True  # Marque la variable comme initialisée
+
+        # Evaluate or validate the expression (if necessary)
+        resolved_value = None
+        resolved_type = None
+
+        # Handle simple or complex expressions
+        if len(expression) == 1:
+            # Single-token expression (e.g., x <- 5)
+            resolved_token = expression[0]
+            resolved_value = resolved_token.value
+            resolved_type = resolved_token.type
+        else:
+            # Complex expressions (e.g., x <- 5 + 3)
+            # Add your evaluation logic here if needed
+            resolved_value = self.tokens_to_string(expression)
+            resolved_type = "EXPRESSION"  # General type for complex expressions
+
+        # Handle variable references in expressions
+        if resolved_type == "VARIABLE":
+            if resolved_value not in self.symbol_table:
+                raise SyntaxError(f"Variable '{resolved_value}' used without being initialized at line {token.line}")
+            resolved_value = self.symbol_table[resolved_value]["value"]
+            resolved_type = self.symbol_table[resolved_value]["type"]
+
+        # Update the symbol table with initialization status, type, and value
+        self.symbol_table[variable_name] = {
+            "initialized": True,  # Keeps track of initialization status
+            "type": resolved_type,
+            "value": resolved_value,  # Stores the value of the variable or expression
+        }
+
         self.skip_whiteline()
         return {
             "type": "assignment",
             "variable": variable_name,
             "expression": self.tokens_to_string(expression),
         }
-    
+
     def parse_expression(self, stop_at_newline=False):
         expression = []
         current_line = self.tokens[self.current_index].line
@@ -475,22 +496,56 @@ class Parser:
         if token.type != "DRAW_COMMAND":
             raise SyntaxError(f"Expected DRAW_COMMAND, got {token.type} at line {token.line}")
 
+        command_name = token.value
         self.current_index += 1
-        args = []
+        self.skip_only_whitespace()
 
+        # Check for opening parenthesis
         if self.current_index >= len(self.tokens) or self.tokens[self.current_index].type != "LPAREN":
-            raise SyntaxError(f"Expected '(' after DRAW_COMMAND at line {token.line}")
+            raise SyntaxError(f"Expected '(' after {command_name} at line {token.line}")
 
         self.current_index += 1
-        while self.current_index < len(self.tokens) and self.tokens[self.current_index].type != "RPAREN":
-            args.append(self.tokens[self.current_index])
-            self.current_index += 1
+        self.skip_only_whitespace()
 
+        args = []
+        while self.current_index < len(self.tokens) and self.tokens[self.current_index].type != "RPAREN":
+            current_token = self.tokens[self.current_index]
+
+            # Validate and parse arguments
+            if current_token.type in {"STRING", "VARIABLE", "NUMBER"}:
+                args.append(current_token.value)
+
+            elif self.current_index < len(self.tokens) and self.tokens[self.current_index].type == "COMMA":
+                next_token = self.tokens[self.current_index + 1] if self.current_index + 1 < len(self.tokens) else None
+                if next_token.type == "RPAREN" or next_token.type == "COMMA":
+                    raise SyntaxError(f"Unexpected ',' at line {self.tokens[self.current_index].line}. Parameter expected after ','.")
+            else:
+                raise SyntaxError(f"Invalid argument '{current_token.value}' at line {current_token.line}")
+
+            self.current_index += 1
+            self.skip_only_whitespace()
+
+        # Check for closing parenthesis
         if self.current_index >= len(self.tokens) or self.tokens[self.current_index].type != "RPAREN":
-            raise SyntaxError(f"Expected ')' after DRAW_COMMAND arguments at line {token.line}")
+            raise SyntaxError(f"Expected ')' to close arguments for {command_name} at line {token.line}")
 
         self.current_index += 1  # Skip RPAREN
-        return {"type": "draw_command", "command": token.value, "args": self.tokens_to_string(args)}
+        self.skip_whiteline()
+
+        # Handle specific cases for `draw` and `freedraw`
+        if command_name == "draw":
+            if len(args) < 3:
+                raise SyntaxError(f"Insufficient arguments for 'draw' at line {token.line}")
+        # Optional: Add more specific checks depending on the expected draw shapes and argument formats
+        elif command_name == "freedraw":
+            if args:
+                raise SyntaxError(f"'freedraw' does not accept any arguments at line {token.line}")
+
+        return {
+            "type": "draw_command",
+            "command": command_name,
+            "args": args,
+        }
 
 
     def parse_function_call(self):
@@ -498,25 +553,24 @@ class Parser:
         Parses a function call like:
         myFunction(5, "Hello")
         """
-
         token = self.tokens[self.current_index]
         if token.type != "FUNCTION_CALL":
             raise SyntaxError(f"Expected a function call, got {token.type} at line {token.line}")
-    
+
         self.current_index += 1
         self.skip_only_whitespace()
-        
+
         if self.current_index >= len(self.tokens) or self.tokens[self.current_index].type != "VARIABLE":
             raise SyntaxError(f"Invalid function name at line {token.line}")
 
         t = self.tokens[self.current_index]
+        function_name = t.value
         self.current_index += 1
         self.skip_only_whitespace()
 
         if self.current_index >= len(self.tokens) or self.tokens[self.current_index].type != "LPAREN":
             raise SyntaxError(f"Expected '(' after function name at line {token.line}")
-        
-        self.current_index += 1 
+        self.current_index += 1
         self.skip_only_whitespace()
 
         # Parse arguments
@@ -524,36 +578,65 @@ class Parser:
         while self.current_index < len(self.tokens) and self.tokens[self.current_index].type != "RPAREN":
             arg_token = self.tokens[self.current_index]
             if arg_token.type in {"VARIABLE", "NUMBER", "STRING"}:
-                arguments.append((arg_token.value, arg_token.type))
+                if arg_token.type == "VARIABLE":
+                    # Resolve variable type and value from symbol table
+                    if arg_token.value not in self.symbol_table:
+                        raise SyntaxError(f"Variable '{arg_token.value}' used without being initialized at line {arg_token.line}")
+                    resolved_type = self.symbol_table[arg_token.value]["type"]
+                    resolved_value = self.symbol_table[arg_token.value]["value"]
+                    arguments.append((resolved_value, resolved_type))
+                else:
+                    # Directly add non-variable arguments
+                    arguments.append((arg_token.value, arg_token.type))
             elif arg_token.type == "COMMA":
                 pass  # Allow commas between arguments
             else:
                 raise SyntaxError(f"Invalid argument syntax at line {arg_token.line}")
             self.current_index += 1
+            self.skip_only_whitespace()
 
         # Ensure closing parenthesis
         if self.current_index >= len(self.tokens) or self.tokens[self.current_index].type != "RPAREN":
             raise SyntaxError(f"Expected ')' to close argument list at line {token.line}")
         self.current_index += 1  # Skip RPAREN
 
-        function_name = t.value
+        # Validate function existence
         if function_name not in self.function_table:
             raise SyntaxError(f"Undefined function '{function_name}' at line {token.line}")
-            
+
         # Validate argument count and types
         declared_func = self.function_table[function_name]
         if len(arguments) != len(declared_func["parameters"]):
-            raise SyntaxError(f"Function '{function_name}' expects {len(declared_func['parameters'])} arguments but got {len(arguments)} at line {token.line}")
-    
+            raise SyntaxError(
+            f"Function '{function_name}' expects {len(declared_func['parameters'])} arguments but got {len(arguments)} at line {token.line}"
+            )
+
         for (arg_value, arg_type), (param_name, param_type) in zip(arguments, declared_func["parameters"]):
-            if param_type != arg_type:
-                raise SyntaxError(f"Type mismatch for parameter '{param_name}' in function '{function_name}' at line {token.line}: expected {param_type}, got {arg_type}")
-    
+            # Map declared parameter type (param_type) to the expected token type
+            type_map = {
+                "int": "NUMBER",
+                "str": "STRING",
+                "bool": "BOOLEAN",
+                "float": "NUMBER"
+            }
+            expected_type = type_map.get(param_type)
+            if expected_type is None:
+                raise SyntaxError(
+                    f"Invalid parameter type '{param_type}' in function '{function_name}'. Allowed types are: {', '.join(type_map.keys())}."
+                )
+            # Compare the expected type with the actual argument type
+            if expected_type != arg_type:
+                raise SyntaxError(
+                    f"Type mismatch for parameter '{param_name}' in function '{function_name}' at line {token.line}: "
+                    f"expected {param_type}, got {arg_type} (value: {arg_value})"
+                )
+
         return {
             "type": "function_call",
             "name": function_name,
             "arguments": arguments,
         }
+
 
     def parse_function_parameters(self):
         """
