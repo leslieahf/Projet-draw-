@@ -36,6 +36,7 @@ class Lexer:
         ("RPAREN", r"\)"),
         ("LBRACE", r"\{"),
         ("RBRACE", r"\}"),
+        ("UNKNOWN", r".+"),
     ]
 
     def __init__(self, code):

@@ -179,6 +179,8 @@ class Parser:
     def parse_expression(self, stop_at_newline=False):
         expression = []
         current_line = self.tokens[self.current_index].line
+        valid_token_types = {spec[0] for spec in Lexer.TOKEN_SPECIFICATIONS}
+
         while self.current_index < len(self.tokens) and self.tokens[self.current_index].type not in {"NEWLINE", "RBRACE", "RPAREN", "SEMICOLON", "COMMA"} :
             if self.current_index >= len(self.tokens):
                 break
@@ -249,11 +251,11 @@ class Parser:
                     raise SyntaxError(f"Invalid use of comparison operator outside allowed blocks (if, while, for, elif) at line {token.line}")
             expression.append(token)
             self.current_index += 1
-        """
+        
         for token in expression :
-            if token.type not in TOKEN_SPECIFICATIONS :
-                raise SyntaxError(f"Unexpected {token.value} at {token.line}")
-        """
+           if token.type == "UNKNOWN":
+                raise SyntaxError(f"Unexpected '{token.value}' at line {token.line}.")
+        
         return expression
     
 
