@@ -1,29 +1,7 @@
 from tok import Lexer
 from difflib import get_close_matches
 import re
-class GrammarAnalyzer:
-    def __init__(self):
-        self.valid_tokens = {
-            "print()": ["prin()", "prit()", "printf()"],
-            "=": ["<-"],
-            "==": ["eq"],
-            ">": ["sup", "sups"],
-            ">=": ["sup", "sups"],
-            "<": ["inf", "infs"],
-            "<=": ["inf", "infs"],
-        }
 
-    def analyse(self, token_value):
-        suggestions = []
-        for valid_token, alternatives in self.valid_tokens.items():
-            all_alternatives = [valid_token] + alternatives
-            matches = get_close_matches(token_value, all_alternatives, n=1, cutoff=0.6)
-            if matches:
-                suggestions.append(f"Did you mean '{matches[0]}' instead of '{token_value}'?")
-        if suggestions:
-            return suggestions
-        else:
-            return [f"No suggestion found for '{token_value}'."]
 
 class Parser:
     def __init__(self, tokens):
@@ -31,16 +9,12 @@ class Parser:
         self.current_index = 0
         self.symbol_table = {}  # Tracks declared variable
         self.function_table = {}  # Tracks declared functions
-        self.analyzer = GrammarAnalyzer()  # Instance de l’analyzer
         self.current_context = None
 
     def parse(self):
         ast = []
-        print(f"DEBUG: Nombre total de tokens : {len(self.tokens)}")
-        print("DEBUG: Tokens :", self.tokens)
         while self.current_index < len(self.tokens):
             token = self.tokens[self.current_index]
-            print(f"DEBUG: Token actuel : {token}")
             
             if token.type == "FUNCTION_DECLARATION":
                 ast.append(self.parse_function_declaration())
@@ -63,14 +37,12 @@ class Parser:
             elif token.type == "FOR":
                 ast.append(self.parse_for())
             else:
-                print(f"l'index actuelle est {self.current_index}")
-                print(f"DEBUG: Reached else block with token: {token}")
                 raise SyntaxError(f"Unexpected {token.value} at line {token.line}")
 
         return ast
 
     def skip_whiteline(self):
-        """Ignore uniquement les espaces ou sauts de ligne présents."""
+        """Ignore whitespace and newline"""
         while self.current_index < len(self.tokens):
             token = self.tokens[self.current_index]
             if token.type in {"WHITESPACE", "NEWLINE"}:
@@ -79,7 +51,7 @@ class Parser:
                 break  
 
     def skip_only_whitespace(self):
-        """Ignore uniquement les espaces."""
+        """Only ignore whitespace"""
         while self.current_index < len(self.tokens):
             token = self.tokens[self.current_index]
             if token.type == "WHITESPACE":
@@ -104,7 +76,7 @@ class Parser:
         valid_contexts = {"FUNCTION_DECLARATION"}
         if self.current_context not in valid_contexts :
             raise SyntaxError(f"Invalid 'return' statement at {token.line}")
-        self.current_index += 1  # Skip the 'return' keyword
+        self.current_index += 1  
         self.skip_whiteline()
 
         # Check if there's an expression after 'return'
@@ -122,51 +94,65 @@ class Parser:
     def parse_assignment(self):
         token = self.tokens[self.current_index]
         variable_name = token.value  # Extract the variable name
-    
+        
         self.current_index += 1
         self.skip_only_whitespace()
 
         # Check for assignment operator `<-`
         if self.current_index >= len(self.tokens) or self.tokens[self.current_index].type != "ASSIGN":
             raise SyntaxError(f"Expected '<-' after {variable_name} at line {token.line}")
-    
+        
         self.current_index += 1
         self.skip_only_whitespace()
 
         # Check for value after the assignment operator
         if self.current_index >= len(self.tokens) or self.tokens[self.current_index] is None:
             raise SyntaxError(f"Expected value after '<-' at line {token.line}")
+        
         # Parse the expression on the right-hand side
         expression = self.parse_expression(stop_at_newline=True)
 
-        # Evaluate or validate the expression (if necessary)
+        # Evaluate or validate the expression
         resolved_value = None
         resolved_type = None
 
-        # Handle simple or complex expressions
         if len(expression) == 1:
             # Single-token expression (e.g., x <- 5)
             resolved_token = expression[0]
             resolved_value = resolved_token.value
             resolved_type = resolved_token.type
+
+            # Handle variable references
+            if resolved_type == "VARIABLE":
+                if resolved_value not in self.symbol_table:
+                    raise SyntaxError(f"Variable '{resolved_value}' used without being initialized at line {token.line}")
+                # Resolve variable type and value
+                resolved_value = self.symbol_table[resolved_value]["value"]
+                resolved_type = self.symbol_table[resolved_value]["type"]
+              # Convert the resolved value to the appropriate type
+              
+            if resolved_type == "NUMBER" and isinstance(resolved_value, str):
+                try:
+                    resolved_value = int(resolved_value)
+                except ValueError:
+                    raise SyntaxError(f"Invalid value '{resolved_value}' for variable '{variable_name}' at line {token.line}. Expected a number.")
+
+
         else:
             # Complex expressions (e.g., x <- 5 + 3)
-            # Add your evaluation logic here if needed
             resolved_value = self.tokens_to_string(expression)
-            resolved_type = "EXPRESSION"  # General type for complex expressions
+            resolved_type = "EXPRESSION"
 
-        # Handle variable references in expressions
-        if resolved_type == "VARIABLE":
-            if resolved_value not in self.symbol_table:
-                raise SyntaxError(f"Variable '{resolved_value}' used without being initialized at line {token.line}")
-            resolved_value = self.symbol_table[resolved_value]["value"]
-            resolved_type = self.symbol_table[resolved_value]["type"]
+        # Ensure valid types
+        valid_types = {"NUMBER", "STRING", "BOOLEAN"}
+        if resolved_type not in valid_types and resolved_type != "EXPRESSION":
+            raise SyntaxError(f"Invalid type '{resolved_type}' for assignment at line {token.line}")
 
         # Update the symbol table with initialization status, type, and value
         self.symbol_table[variable_name] = {
-            "initialized": True,  # Keeps track of initialization status
+            "initialized": True,
             "type": resolved_type,
-            "value": resolved_value,  # Stores the value of the variable or expression
+            "value": resolved_value,
         }
 
         self.skip_whiteline()
@@ -175,6 +161,7 @@ class Parser:
             "variable": variable_name,
             "expression": self.tokens_to_string(expression),
         }
+
 
     def parse_expression(self, stop_at_newline=False):
         expression = []
@@ -432,7 +419,7 @@ class Parser:
 
         self.current_index += 1
         self.skip_whiteline()
-        # Parse le corps du bloc
+
         body = self.parse_block()
         self.skip_whiteline()
         if self.current_index >= len(self.tokens) or self.tokens[self.current_index].type != "RBRACE":
@@ -457,13 +444,13 @@ class Parser:
 
         self.current_index += 1
 
-        # Vérifie la parenthèse ouvrante après le WHILE
+    
         self.skip_whiteline()
         if self.current_index >= len(self.tokens) or self.tokens[self.current_index].type != "LPAREN":
             raise SyntaxError(f"Expected '(' after while at line {token.line}")
         self.skip_only_whitespace()
 
-        # Parse la condition entre les parenthèses
+        # Parsing of the condition
         condition = self.parse_expression()
 
         self.skip_only_whitespace()
@@ -516,10 +503,9 @@ class Parser:
             # Validate and parse arguments
             if current_token.type in {"STRING", "VARIABLE", "NUMBER"}:
                 args.append(current_token.value)
-
             elif self.current_index < len(self.tokens) and self.tokens[self.current_index].type == "COMMA":
                 next_token = self.tokens[self.current_index + 1] if self.current_index + 1 < len(self.tokens) else None
-                if next_token.type == "RPAREN" or next_token.type == "COMMA":
+                if not next_token or next_token.type in {"RPAREN", "COMMA"}:
                     raise SyntaxError(f"Unexpected ',' at line {self.tokens[self.current_index].line}. Parameter expected after ','.")
             else:
                 raise SyntaxError(f"Invalid argument '{current_token.value}' at line {current_token.line}")
@@ -534,11 +520,136 @@ class Parser:
         self.current_index += 1  # Skip RPAREN
         self.skip_whiteline()
 
-        # Handle specific cases for `draw` and `freedraw`
         if command_name == "draw":
-            if len(args) < 3:
-                raise SyntaxError(f"Insufficient arguments for 'draw' at line {token.line}")
-        # Optional: Add more specific checks depending on the expected draw shapes and argument formats
+            # Specify number of arguments excepted 
+            expected_shapes = {
+                "carre": 4,       
+                "rectangle": 5,   
+                "triangle": 3,   
+                "cercle": 4,      
+                "line": 3,        
+                "losange": 5,     
+                "polygon": 5,  
+                "trapeze": 6    
+            }
+
+            shape = args[0]
+            if shape not in expected_shapes:
+                raise SyntaxError(f"Invalid shape '{shape}' for 'draw' at line {token.line}. Expected one of {', '.join(expected_shapes.keys())}.")
+
+            # Check that RGB is valid
+            rgb = args[1]
+            try:
+                if "," in rgb:
+                    # Case: RGB is a string like "255,0,128"
+                    rgb_values = list(map(int, rgb.replace("\"", "").split(",")))
+                elif rgb in self.symbol_table:
+                    # Case: RGB is a variable
+                    rgb_value = self.symbol_table[rgb]["value"]
+                    if not isinstance(rgb_value, str) or "," not in rgb_value:
+                        raise SyntaxError(f"Variable '{rgb}' must contain a string in 'R,G,B' format at line {token.line}.")
+                    rgb_values = list(map(int, rgb_value.split(",")))
+                else:
+                    raise SyntaxError(f"Invalid RGB argument '{rgb}' at line {token.line}. Expected 'R,G,B' or an initialized variable.")
+
+                # Validate the RGB values
+                if len(rgb_values) != 3 or any(value < 0 or value > 255 for value in rgb_values):
+                    raise SyntaxError(f"Invalid RGB values '{rgb}' at line {token.line}. Expected format: 'R,G,B' with values between 0 and 255.")
+            except ValueError:
+                raise SyntaxError(f"RGB values must be integers at line {token.line}.")
+            
+            if not (shape == "line" or shape == "triangle"):
+                arg = args[2]  # Directly access the third argument
+                if isinstance(arg, str) and "," in arg:
+                    coords = arg.replace("\"", "").split(",")
+                    if len(coords) != 2:
+                        raise SyntaxError(f"Invalid coordinates format '{arg}' at line {token.line}. Expected format: 'X1,Y1'.")
+                    if not all(coord.strip().isdigit() for coord in coords):
+                        raise SyntaxError(f"Invalid coordinate format '{arg}' at line {token.line}. Expected numbers separated by commas.")
+                elif arg in self.symbol_table:
+                    value = self.symbol_table[arg]["value"]
+                    if not isinstance(value, (int, float)):
+                        raise SyntaxError(f"Invalid argument '{arg}' at line {token.line}. Must be a valid number or initialized variable.")
+                else:
+                    raise SyntaxError(f"Invalid argument '{arg}' at line {token.line}. Must be a valid coordinate or initialized variable.")
+
+            if shape == "line":
+                arg = args[2]  # Directly access the third argument (coordinates)
+                if isinstance(arg, str) and "," in arg:
+                    # Case: Argument is a coordinate string
+                    coords = [coord.strip() for coord in arg.replace("\"", "").split(",")]
+                    if len(coords) != 4:
+                        raise SyntaxError(f"Invalid coordinates format '{arg}' at line {token.line}. Expected format: 'X1,Y1,X2,Y2'.")
+                    if not all(coord.isdigit() for coord in coords):
+                        raise SyntaxError(f"Coordinates must be positive integers in '{arg}' at line {token.line}.")
+                    coords = list(map(int, coords))  # Convert to integers for further validation
+                    if any(value < 0 for value in coords):
+                        raise SyntaxError(f"Coordinate values must be >= 0 in '{arg}' at line {token.line}.")
+                elif arg in self.symbol_table:
+                    # Case: Argument is a variable
+                    value = self.symbol_table[arg]["value"]
+                    if not isinstance(value, str) or "," not in value:
+                        raise SyntaxError(f"Variable '{arg}' must contain a string of coordinates in 'X1,Y1,X2,Y2' format at line {token.line}.")
+                    coords = [coord.strip() for coord in value.split(",")]
+                    if len(coords) != 4 or not all(coord.isdigit() for coord in coords):
+                        raise SyntaxError(f"Invalid coordinate format in variable '{arg}' at line {token.line}.")
+                    coords = list(map(int, coords))  # Convert to integers for validation
+                    if any(value < 0 for value in coords):
+                        raise SyntaxError(f"Coordinate values must be >= 0 in variable '{arg}' at line {token.line}.")
+                else:
+                    # Invalid argument case
+                    raise SyntaxError(f"Invalid argument '{arg}' at line {token.line}. Must be a valid coordinate string or initialized variable.")
+
+            if shape == "triangle":
+                arg = args[2]  # Directly access the fourth argument (coordinates)
+                if isinstance(arg, str) and "," in arg:
+                    # Case: Argument is a coordinate string
+                    coords = [coord.strip() for coord in arg.replace("\"", "").split(",")]
+                    if len(coords) != 6:
+                        raise SyntaxError(f"Invalid coordinates format '{arg}' at line {token.line}. Expected format: 'X1,Y1, X2,Y2, X3,Y3'.")
+                    if not all(coord.isdigit() for coord in coords):
+                        raise SyntaxError(f"Coordinates must be positive integers in '{arg}' at line {token.line}.")
+                    coords = list(map(int, coords))  # Convert to integers for further validation
+                    if any(value < 0 for value in coords):
+                        raise SyntaxError(f"Coordinate values must be >= 0 in '{arg}' at line {token.line}.")
+                elif arg in self.symbol_table:
+                    # Case: Argument is a variable
+                    value = self.symbol_table[arg]["value"]
+                    if not isinstance(value, str) or "," not in value:
+                        raise SyntaxError(f"Variable '{arg}' must contain a string of coordinates in 'X1,Y1, X2,Y2, X3,Y3' format at line {token.line}.")
+                    coords = [coord.strip() for coord in value.split(",")]
+                    if len(coords) != 4 or not all(coord.isdigit() for coord in coords):
+                        raise SyntaxError(f"Invalid coordinate format in variable '{arg}' at line {token.line}.")
+                    coords = list(map(int, coords))  # Convert to integers for validation
+                    if any(value < 0 for value in coords):
+                        raise SyntaxError(f"Coordinate values must be >= 0 in variable '{arg}' at line {token.line}.")
+                else:
+                    # Invalid argument case
+                    raise SyntaxError(f"Invalid argument '{arg}' at line {token.line}. Must be a valid coordinate string or initialized variable.")
+                
+            if (shape != "line" and shape != "triangle"):
+                for i, arg in enumerate(args[3:], start=3): 
+                    if arg in self.symbol_table:
+                        # Cas : Variable
+                        print("Symbol Table:", self.symbol_table)
+                        value = self.symbol_table[arg]["value"]
+                        if not isinstance(value, int):
+                            raise SyntaxError(f"Invalid value '{value}' for variable '{arg}' at line {token.line}. Expected an integer.")
+                    elif arg.isdigit():
+                        # Cas : Nombre direct
+                        int_value = int(arg)
+                        if int_value <= 0:
+                            raise SyntaxError(f"Invalid argument '{arg}' at line {token.line}. Values must be > 0.")
+                    else:
+                        # Cas : Argument invalide
+                        raise SyntaxError(f"Invalid argument '{arg}' at line {token.line}. Expected an integer or initialized variable.")
+            
+            # Validate remaining arguments
+            expected_arg_count = expected_shapes[shape]
+            if expected_arg_count is not None and len(args) != expected_arg_count:
+                raise SyntaxError(f"Invalid number of arguments for shape '{shape}' at line {token.line}. Expected {expected_arg_count}, got {len(args)}.")
+            
+                
         elif command_name == "freedraw":
             if args:
                 raise SyntaxError(f"'freedraw' does not accept any arguments at line {token.line}")
@@ -548,6 +659,7 @@ class Parser:
             "command": command_name,
             "args": args,
         }
+
 
 
     def parse_function_call(self):
