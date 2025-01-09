@@ -1,4 +1,5 @@
 from tok import Lexer
+from tok import Token
 from difflib import get_close_matches
 import re
 
@@ -73,42 +74,73 @@ class Parser:
         if token.type != "RETURN":
             raise SyntaxError(f"Expected 'return', got {token.type} at line {token.line}")
 
+        # Ensure return is in the proper context
         valid_contexts = {"FUNCTION_DECLARATION"}
-        if self.current_context not in valid_contexts :
+        if self.current_context not in valid_contexts:
             raise SyntaxError(f"Invalid 'return' statement at {token.line}")
-        self.current_index += 1  
+        self.current_index += 1
         self.skip_whiteline()
 
         # Check if there's an expression after 'return'
         if self.current_index < len(self.tokens) and self.tokens[self.current_index].type not in {"NEWLINE", "SEMICOLON", "RBRACE"}:
             expression = self.parse_expression(stop_at_newline=True)
         else:
-            # No expression provided after 'return'
-            expression = None
+            # No expression provided after return
+            raise SyntaxError(
+                f"Missing expression after 'return' at line {token.line}. Did you mean 'return 0'?"
+            )
+
+        # Determine the type based on the first token
+        resolved_type = expression[0].type
+        resolved_value = "".join(token.value for token in expression)
+
+        # Check if the return value is a valid type
+        valid_types = {"NUMBER", "STRING", "BOOLEAN", "VARIABLE"}
+        if resolved_type not in valid_types:
+            raise SyntaxError(
+                f"Invalid type '{resolved_type}' for return value at line {token.line}. Expected one of: {', '.join(valid_types)}."
+            )
+
+        # Handle variable references
+        if resolved_type == "VARIABLE":
+            variable_name = expression[0].value
+            if variable_name not in self.symbol_table:
+                raise SyntaxError(
+                    f"Variable '{variable_name}' used in return statement without being initialized at line {token.line}"
+                )
+            resolved_value = self.symbol_table[variable_name]["value"]
+            resolved_type = self.symbol_table[variable_name]["type"]
+
+        # Ensure the return value is a valid type
+        if resolved_type not in {"NUMBER", "STRING", "BOOLEAN"}:
+            raise SyntaxError(
+                f"Invalid return type '{resolved_type}' at line {token.line}. Expected NUMBER, STRING, or BOOLEAN."
+            )
 
         return {
             "type": "return",
-            "expression": self.tokens_to_string(expression) if expression else None,
+            "value": resolved_value,
+            "resolved_type": resolved_type,
         }
 
     def parse_assignment(self):
         token = self.tokens[self.current_index]
         variable_name = token.value  # Extract the variable name
-        
+
         self.current_index += 1
         self.skip_only_whitespace()
 
         # Check for assignment operator `<-`
         if self.current_index >= len(self.tokens) or self.tokens[self.current_index].type != "ASSIGN":
             raise SyntaxError(f"Expected '<-' after {variable_name} at line {token.line}")
-        
+
         self.current_index += 1
         self.skip_only_whitespace()
 
         # Check for value after the assignment operator
         if self.current_index >= len(self.tokens) or self.tokens[self.current_index] is None:
             raise SyntaxError(f"Expected value after '<-' at line {token.line}")
-        
+
         # Parse the expression on the right-hand side
         expression = self.parse_expression(stop_at_newline=True)
 
@@ -117,31 +149,41 @@ class Parser:
         resolved_type = None
 
         if len(expression) == 1:
-            # Single-token expression (e.g., x <- 5)
+            # Single-token expression (e.g., x <- 5 or x <- call h())
             resolved_token = expression[0]
-            resolved_value = resolved_token.value
-            resolved_type = resolved_token.type
 
-            # Handle variable references
-            if resolved_type == "VARIABLE":
-                if resolved_value not in self.symbol_table:
-                    raise SyntaxError(f"Variable '{resolved_value}' used without being initialized at line {token.line}")
-                # Resolve variable type and value
-                resolved_value = self.symbol_table[resolved_value]["value"]
-                resolved_type = self.symbol_table[resolved_value]["type"]
-              # Convert the resolved value to the appropriate type
-              
-            if resolved_type == "NUMBER" and isinstance(resolved_value, str):
-                try:
-                    resolved_value = int(resolved_value)
-                except ValueError:
-                    raise SyntaxError(f"Invalid value '{resolved_value}' for variable '{variable_name}' at line {token.line}. Expected a number.")
+            if isinstance(resolved_token, dict) and resolved_token["type"] == "function_call":
+                # Handle function call result
+                resolved_value = resolved_token["return_value"]
+                resolved_type = resolved_token["return_type"]
+            elif hasattr(resolved_token, "type"):
+                # Regular token
+                resolved_value = resolved_token.value
+                resolved_type = resolved_token.type
 
+                # Handle variable references
+                if resolved_type == "VARIABLE":
+                    if resolved_value not in self.symbol_table:
+                        raise SyntaxError(f"Variable '{resolved_value}' used without being initialized at line {token.line}")
+                    # Resolve variable type and value
+                    resolved_value = self.symbol_table[resolved_value]["value"]
+                    resolved_type = self.symbol_table[resolved_value]["type"]
+
+                # Convert the resolved value to the appropriate type
+                if resolved_type == "NUMBER" and isinstance(resolved_value, str):
+                    try:
+                        resolved_value = int(resolved_value)
+                    except ValueError:
+                        raise SyntaxError(f"Invalid value '{resolved_value}' for variable '{variable_name}' at line {token.line}. Expected a number.")
+
+            else:
+                raise SyntaxError(f"Unexpected token type in assignment at line {token.line}")
 
         else:
-            # Complex expressions (e.g., x <- 5 + 3)
+            # Complex expressions (e.g., x <- 5 + 3 or x <- call h() + 4)
             resolved_value = self.tokens_to_string(expression)
-            resolved_type = "EXPRESSION"
+            first_token = expression[0]
+            resolved_type = first_token.type if hasattr(first_token, "type") else "EXPRESSION"
 
         # Ensure valid types
         valid_types = {"NUMBER", "STRING", "BOOLEAN"}
@@ -162,88 +204,98 @@ class Parser:
             "expression": self.tokens_to_string(expression),
         }
 
-
     def parse_expression(self, stop_at_newline=False):
         expression = []
         current_line = self.tokens[self.current_index].line
-        valid_token_types = {spec[0] for spec in Lexer.TOKEN_SPECIFICATIONS}
 
-        while self.current_index < len(self.tokens) and self.tokens[self.current_index].type not in {"NEWLINE", "RBRACE", "RPAREN", "SEMICOLON", "COMMA"} :
+        while self.current_index < len(self.tokens) and self.tokens[self.current_index].type not in {"NEWLINE", "RBRACE", "RPAREN", "SEMICOLON", "COMMA"}:
             if self.current_index >= len(self.tokens):
                 break
             token = self.tokens[self.current_index]
             if stop_at_newline and token.line != current_line:
                 break
-            
+
             if token.type == "WHITESPACE":
                 prev_token = expression[-1] if expression else None
                 next_token = self.tokens[self.current_index + 1] if self.current_index + 1 < len(self.tokens) else None
                 if prev_token and next_token:
-                    if prev_token.type in {"NUMBER", "VARIABLE", "STRING","FUNCTION_CALL"} and next_token.type in {"FUNCTION_CALL", "VARIABLE", "STRING","NUMBER"}:
+                    if prev_token.type in {"NUMBER", "VARIABLE", "STRING", "FUNCTION_CALL"} and next_token.type in {"FUNCTION_CALL", "VARIABLE", "STRING", "NUMBER"}:
                         raise SyntaxError(f"Expected operator between {prev_token.value} and {next_token.value} at line {token.line}")
                 self.current_index += 1
                 continue
 
-            # Validation : pas d'opérations entre types incompatibles
+            if token.type == "FUNCTION_CALL":
+                # Parse the function call and add the result to the expression
+                function_call_result = self.parse_function_call()
+                # Wrap in a token-like structure
+                expression.append(Token(
+                    type=function_call_result["return_type"],
+                    value=function_call_result["return_value"],
+                    line=token.line,
+                    column=token.column
+                ))
+                self.skip_whiteline()
+                continue
+
             if token.type == "OPERATOR" or token.type == "COMPARAISON":
                 prev_token = expression[-1] if expression else None
                 next_token = self.tokens[self.current_index + 1] if self.current_index + 1 < len(self.tokens) else None
 
-                if (prev_token is None or next_token is None):
-                    if prev_token is None :
+                if prev_token is None or next_token is None:
+                    if prev_token is None:
                         raise SyntaxError(f"Missing left operand at line {token.line}")
-                    if next_token is None :
+                    if next_token is None:
                         raise SyntaxError(f"Missing right operand at line {token.line}")
-                    
+
                 if prev_token and next_token:
-                    # Trouver le token précédent en ignorant les espaces
-                    prev_index = self.current_index - 1
-                    while prev_index >= 0 and self.tokens[prev_index].type == "WHITESPACE":
-                        prev_index -= 1
-                    prev_token = self.tokens[prev_index] if prev_index >= 0 else None
-
-                    # Trouver le token suivant en ignorant les espaces
-                    next_index = self.current_index + 1
-                    while next_index < len(self.tokens) and self.tokens[next_index].type == "WHITESPACE":
-                        next_index += 1
-                    next_token = self.tokens[next_index] if next_index < len(self.tokens) else None
-
-                    if prev_token.type == "STRING" :
+                    if prev_token.type == "STRING" or next_token.type == "STRING":
                         raise SyntaxError(f"Invalid comparison or operation with strings at line {token.line}")
-                    if next_token.type == "STRING":
-                        raise SyntaxError(f"Invalid comparison or operation with strings at line {token.line}")
-                    
+
                 if token.value == "/":
-                    # Trouver le token précédent en ignorant les espaces
-                    prev_index = self.current_index - 1
-                    while prev_index >= 0 and self.tokens[prev_index].type == "WHITESPACE":
-                        prev_index -= 1
-                    prev_token = self.tokens[prev_index] if prev_index >= 0 else None
-
-                    # Trouver le token suivant en ignorant les espaces
+                    # Skip any whitespace after the division operator
                     next_index = self.current_index + 1
                     while next_index < len(self.tokens) and self.tokens[next_index].type == "WHITESPACE":
                         next_index += 1
-                    next_token = self.tokens[next_index] if next_index < len(self.tokens) else None
-                    # Vérification des opérandes autour de "/"
-                    if prev_token and next_token:
-                        if prev_token.type == "NUMBER" and next_token.type == "NUMBER" and next_token.value == "0":
+
+                    if next_index >= len(self.tokens):
+                        raise SyntaxError(f"Invalid syntax: Missing operand after '/' at line {token.line}")
+
+                    next_token = self.tokens[next_index]
+
+                    # Handle division validation
+                    if prev_token.type in {"NUMBER", "BOOLEAN", "FUNCTION_CALL"}:
+                        # Check if the previous token is a function call and validate its return type
+                        if prev_token.type == "FUNCTION_CALL":
+                            if "return_type" not in prev_token.value or prev_token.value["return_type"] != "NUMBER":
+                                raise SyntaxError(f"Invalid operation! Function call does not return a valid numeric type at line {token.line}")
+
+                        if next_token.type == "NUMBER" and next_token.value == "0":
                             raise SyntaxError(f"Invalid operation! Division by 0 at line {token.line}")
+                        
+                        if next_token.type == "FUNCTION_CALL":
+                            # Check if the next token is a function call and validate its return type
+                            if "return_type" not in next_token.value or next_token.value["return_type"] != "NUMBER":
+                                raise SyntaxError(f"Invalid operation! Function call does not return a valid numeric type at line {token.line}")
+
+                            if "return_value" in next_token.value and next_token.value["return_value"] == 0:
+                                raise SyntaxError(f"Invalid operation! Division by 0 from function return at line {token.line}")
                     else:
-                        raise SyntaxError(f"Invalid syntax: Missing operand for division at line {token.line}")
-                    
-            if token.type == "COMPARAISON":      
-                valid_contexts = {"IF", "WHILE", "FOR", "ELIF"}  # Contextes autorisés pour une comparaison
+                        raise SyntaxError(f"Invalid syntax: Missing or invalid operand for division at line {token.line}")
+
+            if token.type == "COMPARAISON":
+                valid_contexts = {"IF", "WHILE", "FOR", "ELIF"}
                 if self.current_context not in valid_contexts:
                     raise SyntaxError(f"Invalid use of comparison operator outside allowed blocks (if, while, for, elif) at line {token.line}")
             expression.append(token)
             self.current_index += 1
-        
-        for token in expression :
-           if token.type == "UNKNOWN":
+
+        for token in expression:
+            if token.type == "UNKNOWN":
                 raise SyntaxError(f"Unexpected '{token.value}' at line {token.line}.")
-        
+
         return expression
+
+
     
 
     def parse_print(self):
@@ -665,7 +717,7 @@ class Parser:
     def parse_function_call(self):
         """
         Parses a function call like:
-        myFunction(5, "Hello")
+        call myFunction(5, "Hello")
         """
         token = self.tokens[self.current_index]
         if token.type != "FUNCTION_CALL":
@@ -722,7 +774,7 @@ class Parser:
         declared_func = self.function_table[function_name]
         if len(arguments) != len(declared_func["parameters"]):
             raise SyntaxError(
-            f"Function '{function_name}' expects {len(declared_func['parameters'])} arguments but got {len(arguments)} at line {token.line}"
+                f"Function '{function_name}' expects {len(declared_func['parameters'])} arguments but got {len(arguments)} at line {token.line}"
             )
 
         for (arg_value, arg_type), (param_name, param_type) in zip(arguments, declared_func["parameters"]):
@@ -745,12 +797,23 @@ class Parser:
                     f"expected {param_type}, got {arg_type} (value: {arg_value})"
                 )
 
+        # Get the return value from the function
+        function_body = declared_func.get("body", [])
+        return_stmt = next((stmt for stmt in function_body if stmt["type"] == "return"), None)
+
+        if return_stmt is None or "value" not in return_stmt:
+            raise SyntaxError(f"Function '{function_name}' does not return a value.")
+
+        return_value = return_stmt["value"]
+        return_type = return_stmt["resolved_type"]
+
         return {
             "type": "function_call",
             "name": function_name,
             "arguments": arguments,
+            "return_value": return_value,
+            "return_type": return_type,
         }
-
 
     def parse_function_parameters(self):
         """
@@ -792,13 +855,17 @@ class Parser:
 
     def parse_function_declaration(self):
         self.current_context = "FUNCTION_DECLARATION"
+        local_symbol_table = {}  # Local scope for this function
+        global_symbol_table_backup = self.symbol_table  # Backup global scope
+        self.symbol_table = local_symbol_table  # Use local scope
+
         token = self.tokens[self.current_index]
         if token.type != "FUNCTION_DECLARATION":
             raise SyntaxError(f"Expected 'func', got {token.type} at line {token.line}")
-    
+
         self.current_index += 1
         self.skip_only_whitespace()
-        
+
         if self.current_index >= len(self.tokens) or self.tokens[self.current_index].type != "VARIABLE":
             raise SyntaxError(f"Invalid function name at line {token.line}")
 
@@ -808,18 +875,24 @@ class Parser:
 
         if self.current_index >= len(self.tokens) or self.tokens[self.current_index].type != "LPAREN":
             raise SyntaxError(f"Expected '(' after function name at line {token.line}")
-    
         self.current_index += 1
         self.skip_only_whitespace()
 
-        # Parse parameters using the new function
+        # Parse parameters
         parameters = self.parse_function_parameters()
 
         if self.current_index >= len(self.tokens) or self.tokens[self.current_index].type != "RPAREN":
             raise SyntaxError(f"Expected ')' after parameters at line {token.line}")
-    
-        self.current_index += 1 
+        self.current_index += 1
         self.skip_whiteline()
+
+        # Initialize parameters in local symbol table
+        for param_name, param_type in parameters:
+            local_symbol_table[param_name] = {
+                "initialized": True,
+                "type": param_type,
+                "value": None,  # Parameters have no initial value unless explicitly set
+            }
 
         # Parse function body
         if self.current_index >= len(self.tokens) or self.tokens[self.current_index].type != "LBRACE":
@@ -834,15 +907,19 @@ class Parser:
         self.current_index += 1
         self.skip_whiteline()
 
+        # Validate return statement presence
         found_return = any(statement.get("type") == "return" for statement in body)
         if not found_return:
             raise SyntaxError(f"Missing 'return' statement in function '{func_name}' at line {token.line}")
-    
+
+        # Restore global symbol table after parsing
+        self.symbol_table = global_symbol_table_backup
         self.current_context = None
 
         # Store the function in the function table
         self.function_table[func_name] = {
             "parameters": parameters,
+            "body": body,
         }
 
         return {
@@ -851,6 +928,7 @@ class Parser:
             "parameters": parameters,
             "body": body,
         }
+
 
 
     def tokens_to_string(self, tokens):
