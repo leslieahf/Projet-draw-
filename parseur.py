@@ -74,10 +74,19 @@ class Parser:
         if token.type != "RETURN":
             raise SyntaxError(f"Expected 'return', got {token.type} at line {token.line}")
 
-        # Ensure return is in the proper context
-        valid_contexts = {"FUNCTION_DECLARATION"}
-        if self.current_context not in valid_contexts:
-            raise SyntaxError(f"Invalid 'return' statement at {token.line}")
+        # Verify if `return` is within a function by checking preceding tokens
+        is_inside_function = False
+        for i in range(self.current_index - 1, -1, -1):
+            prev_token = self.tokens[i]
+            if prev_token.type == "FUNCTION_DECLARATION":
+                # Check if an opening brace `{` follows the FUNCTION_DECLARATION
+                if any(tok.type == "LBRACE" for tok in self.tokens[i + 1:self.current_index]):
+                    is_inside_function = True
+                    break
+
+        if not is_inside_function:
+            raise SyntaxError(f"Invalid 'return' statement at line {token.line}. Must be inside a function.")
+
         self.current_index += 1
         self.skip_whiteline()
 
@@ -122,6 +131,7 @@ class Parser:
             "value": resolved_value,
             "resolved_type": resolved_type,
         }
+
 
     def parse_assignment(self):
         token = self.tokens[self.current_index]
@@ -263,22 +273,40 @@ class Parser:
                     next_token = self.tokens[next_index]
 
                     # Handle division validation
-                    if prev_token.type in {"NUMBER", "BOOLEAN", "FUNCTION_CALL"}:
-                        # Check if the previous token is a function call and validate its return type
+                    if prev_token.type in {"NUMBER", "BOOLEAN", "FUNCTION_CALL", "VARIABLE"}:
+                        # Handle previous token being a function call
                         if prev_token.type == "FUNCTION_CALL":
                             if "return_type" not in prev_token.value or prev_token.value["return_type"] != "NUMBER":
                                 raise SyntaxError(f"Invalid operation! Function call does not return a valid numeric type at line {token.line}")
 
-                        if next_token.type == "NUMBER" and next_token.value == "0":
-                            raise SyntaxError(f"Invalid operation! Division by 0 at line {token.line}")
-                        
+                        # Handle previous token being a variable
+                        if prev_token.type == "VARIABLE":
+                            if prev_token.value not in self.symbol_table:
+                                raise SyntaxError(f"Variable '{prev_token.value}' used without being initialized at line {token.line}")
+                            prev_value = self.symbol_table[prev_token.value]
+                            if prev_value["type"] != "NUMBER":
+                                raise SyntaxError(f"Invalid operation! Variable '{prev_token.value}' does not contain a numeric value at line {token.line}")
+
+                        # Handle next token being a function call
                         if next_token.type == "FUNCTION_CALL":
-                            # Check if the next token is a function call and validate its return type
                             if "return_type" not in next_token.value or next_token.value["return_type"] != "NUMBER":
                                 raise SyntaxError(f"Invalid operation! Function call does not return a valid numeric type at line {token.line}")
-
                             if "return_value" in next_token.value and next_token.value["return_value"] == 0:
                                 raise SyntaxError(f"Invalid operation! Division by 0 from function return at line {token.line}")
+
+                        # Handle next token being a variable
+                        if next_token.type == "VARIABLE":
+                            if next_token.value not in self.symbol_table:
+                                raise SyntaxError(f"Variable '{next_token.value}' used without being initialized at line {token.line}")
+                            next_value = self.symbol_table[next_token.value]
+                            if next_value["type"] != "NUMBER":
+                                raise SyntaxError(f"Invalid operation! Variable '{next_token.value}' does not contain a numeric value at line {token.line}")
+                            if next_value["value"] == 0:
+                                raise SyntaxError(f"Invalid operation! Division by 0 using variable '{next_token.value}' at line {token.line}")
+
+                        # Handle next token being a number
+                        if next_token.type == "NUMBER" and next_token.value == "0":
+                            raise SyntaxError(f"Invalid operation! Division by 0 at line {token.line}")
                     else:
                         raise SyntaxError(f"Invalid syntax: Missing or invalid operand for division at line {token.line}")
 
