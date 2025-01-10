@@ -6,7 +6,7 @@ code_drawCarre = [
     "    SDL_RenderFillRect(renderer, &rect);  // Dessiner le carré",
     "}"
 ]
-
+ 
 code_drawRectangle = [
     "",
     "void drawRectangle(SDL_Renderer* renderer, int x, int y, int largeur, int hauteur, int r, int g, int b) {",
@@ -15,7 +15,7 @@ code_drawRectangle = [
     "    SDL_RenderFillRect(renderer, &rect);            // Dessiner le rectangle",
     "}"
 ]
-
+ 
 code_drawCercle = [
     "",
     "void drawCercle(SDL_Renderer* renderer, int cx, int cy, int rayon, int r, int g, int b) {",
@@ -29,7 +29,7 @@ code_drawCercle = [
     "    }",
     "}"
 ]
-
+ 
 code_drawTriangle = [
     "void drawTriangle(SDL_Renderer* renderer, int x1, int y1, int x2, int y2, int x3, int y3, int r, int g, int b) {",
     "SDL_SetRenderDrawColor(renderer, r, g, b, 255);  // Définir la couleur du triangle",
@@ -37,16 +37,16 @@ code_drawTriangle = [
     "SDL_RenderDrawLine(renderer, x2, y2, x3, y3);    // Ligne entre le deuxième et le troisième point",
     "SDL_RenderDrawLine(renderer, x3, y3, x1, y1);  // Ligne entre le troisième et le premier point",
 "}",
-
+ 
 ]
-
+ 
 code_drawPolygon =[
    " void drawPolygon(SDL_Renderer* renderer, int cx, int cy, int rayon, int sides, int r, int g, int b) {",
     "SDL_SetRenderDrawColor(renderer, r, g, b, 255);",
     "double angleStep = 2 * M_PI / sides;  // Angle entre chaque sommet",
     "int x1 = cx + rayon * cos(0);        // Premier sommet",
     "int y1 = cy + rayon * sin(0);",
-
+ 
     "for (int i = 1; i <= sides; i++) {",
         "int x2 = cx + rayon * cos(i * angleStep);  // Calcul du prochain sommet",
         "int y2 = cy + rayon * sin(i * angleStep);",
@@ -56,7 +56,7 @@ code_drawPolygon =[
     "}"
 "}"
 ]
-
+ 
 code_drawLosange = [
     "void drawLosange(SDL_Renderer* renderer, int cx, int cy, int largeur, int hauteur, int r, int g, int b) {",
     "SDL_SetRenderDrawColor(renderer, r, g, b, 255);",
@@ -68,16 +68,16 @@ code_drawLosange = [
     "int y3 = cy + hauteur / 2;",
     "int x4 = cx - largeur / 2; // Point gauche",
     "int y4 = cy;",
-
+ 
     "// Dessiner les 4 côtés",
     "SDL_RenderDrawLine(renderer, x1, y1, x2, y2);",
     "SDL_RenderDrawLine(renderer, x2, y2, x3, y3);",
     "SDL_RenderDrawLine(renderer, x3, y3, x4, y4);",
     "SDL_RenderDrawLine(renderer, x4, y4, x1, y1);",
 "}",
-
+ 
 ]
-
+ 
 code_drawTrapeze =[
     "void drawTrapeze(SDL_Renderer* renderer, int x, int y, int largeurHaut, int largeurBas, int hauteur, int r, int g, int b) {",
     "SDL_SetRenderDrawColor(renderer, r, g, b, 255);",
@@ -89,16 +89,16 @@ code_drawTrapeze =[
     "int y3 = y + hauteur;",
     "int x4 = x - (largeurBas - largeurHaut) / 2;              // Coin inférieur gauche",
     "int y4 = y + hauteur;",
-
+ 
     "// Dessiner les côtés",
     "SDL_RenderDrawLine(renderer, x1, y1, x2, y2);",
     "SDL_RenderDrawLine(renderer, x2, y2, x3, y3);",
     "SDL_RenderDrawLine(renderer, x3, y3, x4, y4);",
     "SDL_RenderDrawLine(renderer, x4, y4, x1, y1);",
 "}",
-
+ 
 ]
-
+ 
 code_drawLine = [
     "",
    "void drawLine(SDL_Renderer* renderer, int x1, int y1, int x2, int y2, int r, int g, int b) {",
@@ -106,7 +106,7 @@ code_drawLine = [
     "SDL_RenderDrawLine(renderer, x1, y1, x2, y2);   // Dessiner la ligne de (x1, y1) à (x2, y2)",
 "}",
 ]
-
+ 
 code_create_window = [
     "//Create window",
     "SDL_Init(SDL_INIT_VIDEO);",  # Initialiser SDL
@@ -116,7 +116,7 @@ code_create_window = [
     "SDL_RenderClear(renderer);",  # Effacer l'écran avec la couleur de fond
     ""
 ]
-
+ 
 code_create_window_modify = [
     "//Create window",
     "SDL_Init(SDL_INIT_VIDEO);",  # Initialiser SDL
@@ -126,7 +126,7 @@ code_create_window_modify = [
     "SDL_RenderClear(renderer);",  # Effacer l'écran avec la couleur de fond
     ""
 ]
-
+ 
 code_create_window_fullscreen = [
     "//Create window",
     "SDL_Init(SDL_INIT_VIDEO);",  # Initialiser SDL
@@ -137,7 +137,7 @@ code_create_window_fullscreen = [
     ""
 ]
  
-
+ 
 code_staywindow_open = [
     "// Garder la fenêtre ouverte en permanence avec une boucle événementielle",
     "SDL_RenderPresent(renderer);",  # Afficher le rendu une seule fois avant la boucle
@@ -155,9 +155,9 @@ code_staywindow_open = [
     "}",
    
 ]
-
-
-
+ 
+ 
+ 
 def get_parametres_carre(x, y, taille, r, g, b):
     return [
         "{"
@@ -173,7 +173,7 @@ def get_parametres_carre(x, y, taille, r, g, b):
         "}"
         ""
     ]
-
+ 
 def get_parametres_rectangle(x, y, taille, r, g, b):
     return [
         "{",
@@ -190,7 +190,7 @@ def get_parametres_rectangle(x, y, taille, r, g, b):
         "   // Fin parametres rectangle",
         "}"
     ]
-
+ 
 def get_parametres_cercle(x, y, taille, r, g, b):
     return [
         "{",
@@ -205,7 +205,7 @@ def get_parametres_cercle(x, y, taille, r, g, b):
         "   // Fin parametres cercle",
         "}"
     ]
-
+ 
 def get_parametres_triangle(x1, y1, x2, y2, x3, y3, r, g, b):
     return [
         "{",
@@ -223,7 +223,7 @@ def get_parametres_triangle(x1, y1, x2, y2, x3, y3, r, g, b):
         "   // Fin parametres triangle",
         "}"
     ]
-
+ 
 def get_parametres_polygone(cx, cy, rayon, sides, r, g, b):
     nom = {5: "pentagone", 6: "hexagone", 8: "octogone"}.get(sides, "polygone")
     return [
@@ -239,7 +239,7 @@ def get_parametres_polygone(cx, cy, rayon, sides, r, g, b):
         f"   // Fin parametres {nom}",
         "}"
     ]
-
+ 
 def get_parametres_losange(cx, cy, largeur, hauteur, r, g, b):
     return [
         "{",
@@ -255,7 +255,7 @@ def get_parametres_losange(cx, cy, largeur, hauteur, r, g, b):
         "   // Fin parametres losange",
         "}"
     ]
-
+ 
 def get_parametres_trapeze(x, y, largeur_haut, largeur_bas, hauteur, r, g, b):
     return [
         "{",
@@ -272,7 +272,7 @@ def get_parametres_trapeze(x, y, largeur_haut, largeur_bas, hauteur, r, g, b):
         "   // Fin parametres trapèze",
         "}"
     ]
-
+ 
 def get_parametres_line(x1, y1, x2, y2,r, g, b):
     return [
         "{",
@@ -328,28 +328,28 @@ def insert_code_before_first_occurrence(c_code, target_line, code_to_add):
                 c_code.insert(i, code_to_add)
             break  # Arrêter après avoir inséré
     return c_code
-
-
-
-
+ 
+ 
+ 
+ 
 def insert_after_line(c_code, target_line, code_to_insert):
         # Trouver l'index de la ligne cible
         index = next((i for i, line in enumerate(c_code) if line == target_line), -1)
-
+ 
         if index != -1:  # Si la ligne cible est trouvée
             # Ajouter le code à insérer juste après cette ligne
             c_code[index+1:index+1] = code_to_insert
         else:
             print("erreur")
-
+ 
 def insert_after_previous_line(c_code, code_to_insert):
     """
     Insère un bloc de code juste après la dernière ligne du code présent.
-
+ 
     Args:
         c_code (list of str): Liste des lignes du code C.
         code_to_insert (list of str): Bloc de code à insérer sous forme de liste de lignes.
-
+ 
     Returns:
         None
     """
@@ -367,13 +367,13 @@ def insert_code_if_comment_not_present(c_code, code_to_insert, comment_variable)
     # Si le comment_variable n'est pas présent, ajouter le code
     if not comment_present:
         c_code.extend(code_to_insert)
-
+ 
 def check_comment_in_code(c_code, comment_variable):
     for line in c_code:
         if comment_variable in line:
             return 1  # Si le commentaire est trouvé, retourne 1
     return 0  # Si le commentaire n'est pas trouvé, retourne 0
-
+ 
 def insert_code_after_last_occurrence(c_code, target_line, code_to_add):
     # Rechercher la dernière occurrence du mot de recherche
     last_index = -1
@@ -385,11 +385,11 @@ def insert_code_after_last_occurrence(c_code, target_line, code_to_add):
     if last_index == -1:
         print(f"Erreur : '{target_line}' n'a pas été trouvé dans le code.")
         return
-
+ 
     # Si on a trouvé la dernière occurrence, on ajoute le code après cette ligne
     c_code.insert(last_index + 1, code_to_add)
     print(f"Code ajouté après la ligne : {last_index}")
- # Diviser les arguments intelligemment en tenant compte des guillemets
+# Diviser les arguments intelligemment en tenant compte des guillemets
 def split_arguments(argument_string):
                 """Divise une chaîne d'arguments en morceaux tout en respectant les guillemets et les virgules."""
                 args = []
@@ -420,7 +420,7 @@ def insert_after_line_2x(c_code, target_line, code_to_insert_1, code_to_insert_2
     else:
         print("Erreur : Ligne cible introuvable")
     return c_code
-
+ 
 code_instructions_freedraw = [
     "// Fonction pour afficher les instructions",
     "void afficherInstructions(SDL_Renderer* renderer, int pinceauTaille, int hue) {",
@@ -441,6 +441,7 @@ code_instructions_freedraw = [
     "    const char* instructions[] = {",
     "        \"=== Commandes ===\",",
     "        \"Clique gauche : Dessiner\",",
+    "        \"R : Rouge | G : Vert | B : Bleu\",",
     "        \"E : Activer/Désactiver la gomme\",",
     "        \"A : Augmenter la taille du pinceau\",",
     "        \"M : Réduire la taille du pinceau\",",
@@ -511,7 +512,9 @@ code_instructions_freedraw = [
     "    SDL_RenderDrawRect(renderer, &curseur);",
     "}"
 ]
-
+ 
+ 
+ 
 code_mainProgram_freedraw = [
     "    if (SDL_Init(SDL_INIT_VIDEO) != 0) {",
     "        printf(\"Erreur lors de l'initialisation de SDL: %s\\n\", SDL_GetError());",
