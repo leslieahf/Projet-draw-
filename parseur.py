@@ -10,32 +10,83 @@ class Parser:
         self.current_index = 0
         self.symbol_table = {}  # Tracks declared variable
         self.function_table = {}  # Tracks declared functions
+        self.context1 = 0 # count the context of the if
+        self.context2 = 0 # count the context of the elif
+        self.context3 = 0 # count the context of the else
         self.current_context = None
 
     def parse(self):
         ast = []
         while self.current_index < len(self.tokens):
             token = self.tokens[self.current_index]
-            
             if token.type == "FUNCTION_DECLARATION":
+                self.context1 = 0
+                self.context2 = 0
+                self.context3 = 0
                 ast.append(self.parse_function_declaration())
             elif token.type == "FUNCTION_CALL":
+                self.context1 = 0
+                self.context2 = 0
+                self.context3 = 0
                 ast.append(self.parse_function_call())
             elif token.type == "VARIABLE":
+                self.context1 = 0
+                self.context2 = 0
+                self.context3 = 0
                 ast.append(self.parse_assignment())
             elif token.type == "NUMBER":
+                self.context1 = 0
+                self.context2 = 0
+                self.context3 = 0
                 raise SyntaxError(f"Unexpected '{token.value}' at line {token.line}. Did you forget an assignment?")
             elif token.type == "DRAW_COMMAND" :
+                self.context1 = 0
+                self.context2 = 0
+                self.context3 = 0
                 ast.append(self.parse_draw_command())
             elif token.type == "PRINT":
+                self.context1 = 0
+                self.context2 = 0
+                self.context3 = 0
                 ast.append(self.parse_print())
             elif token.type == "IF":
+                self.context1 = 1
                 ast.append(self.parse_if())
+            elif token.type == "HELP":
+                self.context1 = 0
+                self.context2 = 0
+                self.context3 = 0
+                ast.append(self.parse_help())
+            elif token.type == "ELIF":
+                self.context2 = 1
+                ast.append(self.parse_elif())
+            elif token.type == "WIN":
+                self.context1 = 0
+                self.context2 = 0
+                self.context3 = 0
+                ast.append(self.parse_win())
+            elif token.type == "ELSE":
+                self.context3 += 1
+                ast.append(self.parse_else())
+            elif token.type == "BREAK":
+                self.context1 = 0
+                self.context2 = 0
+                self.context3 = 0
+                ast.append(self.parse_break())
             elif token.type == "RETURN":
+                self.context1 = 0
+                self.context2 = 0
+                self.context3 = 0
                 ast.append(self.parse_return())
             elif token.type == "WHILE":
+                self.context1 = 0
+                self.context2 = 0
+                self.context3 = 0
                 ast.append(self.parse_while())
             elif token.type == "FOR":
+                self.context1 = 0
+                self.context2 = 0
+                self.context3 = 0
                 ast.append(self.parse_for())
             else:
                 raise SyntaxError(f"Unexpected {token.value} at line {token.line}")
@@ -65,6 +116,24 @@ class Parser:
             return self.tokens[self.current_index + 1].type
         return None
 
+    def parse_break(self):
+        """
+        Parses a 'break' statement.
+        """
+        token = self.tokens[self.current_index]
+        if token.type != "BREAK":
+            raise SyntaxError(f"Expected 'break', got {token.type} at line {token.line}")
+
+        # Ensure 'break' is inside a loop (for or while)
+        if self.current_context not in {"FOR", "WHILE"}:
+            raise SyntaxError(f"'break' statement not allowed outside of loops at line {token.line}")
+
+        self.current_index += 1
+        self.skip_whiteline()
+        return {
+            "type": "break",
+        }
+
     def parse_return(self):
         """
         Parses a return statement like:
@@ -73,19 +142,6 @@ class Parser:
         token = self.tokens[self.current_index]
         if token.type != "RETURN":
             raise SyntaxError(f"Expected 'return', got {token.type} at line {token.line}")
-
-        # Verify if `return` is within a function by checking preceding tokens
-        is_inside_function = False
-        for i in range(self.current_index - 1, -1, -1):
-            prev_token = self.tokens[i]
-            if prev_token.type == "FUNCTION_DECLARATION":
-                # Check if an opening brace `{` follows the FUNCTION_DECLARATION
-                if any(tok.type == "LBRACE" for tok in self.tokens[i + 1:self.current_index]):
-                    is_inside_function = True
-                    break
-
-        if not is_inside_function:
-            raise SyntaxError(f"Invalid 'return' statement at line {token.line}. Must be inside a function.")
 
         self.current_index += 1
         self.skip_whiteline()
@@ -131,6 +187,7 @@ class Parser:
             "value": resolved_value,
             "resolved_type": resolved_type,
         }
+
 
 
     def parse_assignment(self):
@@ -323,9 +380,6 @@ class Parser:
 
         return expression
 
-
-    
-
     def parse_print(self):
         token = self.tokens[self.current_index]
         if token.type != "PRINT":
@@ -356,6 +410,39 @@ class Parser:
             "type": "print",
             "expression": self.tokens_to_string(expression),
         }
+    
+    def parse_else(self):
+        token = self.tokens[self.current_index]
+        if token.type != "ELSE":
+            raise SyntaxError(f"Expected 'else', got {token.type} at line {token.line}")
+
+        if self.context1 == 0 and self.context2 == 0  :
+            raise SyntaxError(f"'else' must follow 'if' or 'elif' statement at line {token.line}")
+        
+        
+        self.current_index += 1
+        self.skip_whiteline()
+
+        # Parse the body
+        if self.current_index >= len(self.tokens) or self.tokens[self.current_index].type != "LBRACE":
+            raise SyntaxError(f"Expected '{{' after 'else' at line {token.line}")
+        self.current_index += 1
+        self.skip_whiteline()
+
+        body = self.parse_block()
+        self.context1 = 0
+        self.context2 = 0
+        self.context3 = 1
+
+        self.skip_whiteline()
+
+        if self.current_index >= len(self.tokens) or self.tokens[self.current_index].type != "RBRACE":
+            raise SyntaxError(f"Expected '}}' after 'else' block at line {token.line}")
+        self.current_index += 1
+        self.skip_whiteline()
+
+        return {"type": "else", "body": body}
+
     def parse_if(self):
         self.current_context = "IF"
         token = self.tokens[self.current_index]
@@ -377,6 +464,9 @@ class Parser:
         if self.current_index >= len(self.tokens) or self.tokens[self.current_index].type != "RPAREN":
             raise SyntaxError(f"Expected ')' after if condition at line {token.line}")
 
+        if len(condition) == 1:
+            raise SyntaxError(f"Invalid or missing condition inside 'if' at line {token.line}")
+        
         self.current_index += 1
         self.skip_whiteline()
         for tok in condition:
@@ -395,6 +485,9 @@ class Parser:
 
         # Parse le corps du bloc
         body = self.parse_block()
+        self.context1 = 1
+        self.context2 = 0
+        self.context3 = 0
         self.skip_whiteline()
         if self.current_index >= len(self.tokens) or self.tokens[self.current_index].type != "RBRACE":
             raise SyntaxError(f"Expected '}}' after if condition at line {token.line}")
@@ -403,6 +496,68 @@ class Parser:
 
         self.current_context = None
         return {"type": "if", "condition": self.tokens_to_string(condition), "body": body}
+          
+
+    def parse_elif(self):
+        self.current_context = "ELIF"
+        token = self.tokens[self.current_index]
+        if token.type != "ELIF":
+            raise SyntaxError(f"Expected elif, got {token.type} at line {token.line}")
+
+        if token.type != "ELIF":
+            raise SyntaxError(f"Expected 'elif', got {token.type} at line {token.line}")
+
+        if self.context1 == 0 :
+            raise SyntaxError(f"'elif' must follow 'if'  at line {token.line}")
+
+        self.current_index += 1
+
+        # Vérifie la parenthèse ouvrante après le ELIF
+        self.skip_whiteline()
+        if self.current_index >= len(self.tokens) or self.tokens[self.current_index].type != "LPAREN":
+            raise SyntaxError(f"Expected '(' after elif at line {token.line}")
+        self.skip_only_whitespace()
+
+        # Parse la condition entre les parenthèses
+        condition = self.parse_expression()
+
+        self.skip_only_whitespace()
+        if self.current_index >= len(self.tokens) or self.tokens[self.current_index].type != "RPAREN":
+            raise SyntaxError(f"Expected ')' after elif condition at line {token.line}")
+
+        if len(condition) == 1:
+            raise SyntaxError(f"Invalid or missing condition inside 'elif' at line {token.line}")
+        
+        self.current_index += 1
+        self.skip_whiteline()
+        for tok in condition:
+            if tok.type == "VARIABLE" and tok.value not in self.symbol_table:
+                raise SyntaxError(f"'{tok.value}' used without being initialized at line {tok.line}")
+
+        # Gérer les espaces et sauts de ligne avant le crochet ouvrant
+        while self.current_index < len(self.tokens) and self.tokens[self.current_index].type in {"WHITESPACE", "NEWLINE"}:
+            self.current_index += 1
+
+        if self.current_index >= len(self.tokens) or self.tokens[self.current_index].type != "LBRACE":
+            raise SyntaxError(f"Expected '{{' after elif condition at line {token.line}")
+
+        self.current_index += 1
+        self.skip_whiteline()
+
+        # Parse le corps du bloc
+        body = self.parse_block()
+        self.context1 = 0
+        self.context2 = 1
+        self.context3 = 0
+        self.skip_whiteline()
+        if self.current_index >= len(self.tokens) or self.tokens[self.current_index].type != "RBRACE":
+            raise SyntaxError(f"Expected '}}' after elif condition at line {token.line}")
+        self.current_index +=1
+        self.skip_whiteline()
+
+        self.current_context = None
+        return {"type": "elif", "condition": self.tokens_to_string(condition), "body": body}
+
 
     def parse_for_expression(self):
         """
@@ -443,32 +598,87 @@ class Parser:
 
     def parse_block(self):
         ast = []
+        self.context1 = 0
+        self.context2 = 0
+        self.context3 = 0
         while self.current_index < len(self.tokens) :
             self.skip_whiteline()
             if self.current_index >= len(self.tokens):
                 break
             token = self.tokens[self.current_index]
             if token.type == "FUNCTION_DECLARATION":
+                self.context1 = 0
+                self.context2 = 0
+                self.context3 = 0
                 ast.append(self.parse_function_declaration())
             elif token.type == "FUNCTION_CALL":
+                self.context1 = 0
+                self.context2 = 0
+                self.context3 = 0
                 ast.append(self.parse_function_call())
             elif token.type == "VARIABLE":
+                self.context1 = 0
+                self.context2 = 0
+                self.context3 = 0
                 ast.append(self.parse_assignment())
             elif token.type == "NUMBER":
+                self.context1 = 0
+                self.context2 = 0
+                self.context3 = 0
                 raise SyntaxError(f"Unexpected '{token.value}' at line {token.line}. Did you forget an assignment?")
             elif token.type == "DRAW_COMMAND" :
+                self.context1 = 0
+                self.context2 = 0
+                self.context3 = 0
                 ast.append(self.parse_draw_command())
             elif token.type == "PRINT":
+                self.context1 = 0
+                self.context2 = 0
+                self.context3 = 0
                 ast.append(self.parse_print())
             elif token.type == "IF":
+                self.context1 = 1
                 ast.append(self.parse_if())
+            elif token.type == "ELIF":
+                self.context2 = 1
+                ast.append(self.parse_elif())
+            elif token.type == "WIN":
+                self.context1 = 0
+                self.context2 = 0
+                self.context3 = 0
+                ast.append(self.parse_win())
+            elif token.type == "HELP":
+                self.context1 = 0
+                self.context2 = 0
+                self.context3 = 0
+                ast.append(self.parse_help())
+            elif token.type == "ELSE":
+                self.context3 += 1
+                ast.append(self.parse_else())
+            elif token.type == "BREAK":
+                self.context1 = 0
+                self.context2 = 0
+                self.context3 = 0
+                ast.append(self.parse_break())
             elif token.type == "RETURN":
+                self.context1 = 0
+                self.context2 = 0
+                self.context3 = 0
                 ast.append(self.parse_return())
             elif token.type == "WHILE":
+                self.context1 = 0
+                self.context2 = 0
+                self.context3 = 0
                 ast.append(self.parse_while())
             elif token.type == "RBRACE":
+                self.context1 = 0
+                self.context2 = 0
+                self.context3 = 0
                 break
             elif token.type == "FOR":
+                self.context1 = 0
+                self.context2 = 0
+                self.context3 = 0
                 ast.append(self.parse_for())
             else:
                 raise SyntaxError(f"Unexpected {token.value} at line {token.line}")
@@ -549,7 +759,6 @@ class Parser:
         self.current_index += 1
         self.skip_whiteline()
 
-      
         # Parse le corps du bloc
         body = self.parse_block()
         self.skip_whiteline()
@@ -559,6 +768,90 @@ class Parser:
         self.skip_whiteline()
         self.current_context = None
         return {"type": "while", "condition": self.tokens_to_string(condition), "body": body}
+
+    def parse_win(self):
+        """
+        Parses a window creation command like:
+        win("width,height", "r,g,b") or win(var_dimensions, var_rgb)
+        """
+        token = self.tokens[self.current_index]
+        if token.type != "WIN":
+            raise SyntaxError(f"Expected 'win', got {token.type} at line {token.line}")
+
+        command_name = token.value
+        self.current_index += 1
+        self.skip_only_whitespace()
+
+        # Check for opening parenthesis
+        if self.current_index >= len(self.tokens) or self.tokens[self.current_index].type != "LPAREN":
+            raise SyntaxError(f"Expected '(' after {command_name} at line {token.line}")
+
+        self.current_index += 1
+        self.skip_only_whitespace()
+
+        args = []
+        while self.current_index < len(self.tokens) and self.tokens[self.current_index].type != "RPAREN":
+            current_token = self.tokens[self.current_index]
+
+            # Validate and parse arguments
+            if current_token.type in {"STRING", "VARIABLE"}:
+                args.append(current_token.value)
+            elif self.current_index < len(self.tokens) and self.tokens[self.current_index].type == "COMMA":
+                next_token = self.tokens[self.current_index + 1] if self.current_index + 1 < len(self.tokens) else None
+                if not next_token or next_token.type in {"RPAREN", "COMMA"}:
+                    raise SyntaxError(f"Unexpected ',' at line {self.tokens[self.current_index].line}. Parameter expected after ','.")
+            else:
+                raise SyntaxError(f"Invalid argument '{current_token.value}' at line {current_token.line}. Expected STRING or VARIABLE.")
+
+            self.current_index += 1
+            self.skip_only_whitespace()
+
+        # Check for closing parenthesis
+        if self.current_index >= len(self.tokens) or self.tokens[self.current_index].type != "RPAREN":
+            raise SyntaxError(f"Expected ')' to close arguments for {command_name} at line {token.line}")
+
+        if len(args) != 2:
+            raise SyntaxError(f"Invalid number of arguments for 'win' at line {token.line}. Expected 2 arguments (\"width,height\", \"r,g,b\").")
+
+        # Resolve dimensions argument
+        if args[0] in self.symbol_table:
+            if not self.symbol_table[args[0]]["initialized"]:
+                raise SyntaxError(f"Variable '{args[0]}' used without being initialized at line {token.line}")
+            dimensions = self.symbol_table[args[0]]["value"]
+        else:
+            dimensions = args[0]
+
+        # Validate dimensions
+        dimensions = dimensions.replace("\"", "").split(",")
+        if len(dimensions) != 2 or not all(dim.isdigit() for dim in dimensions):
+            raise SyntaxError(f"Invalid dimensions '{args[0]}' at line {token.line}. Expected format: \"width,height\" with positive integers.")
+
+        # Resolve RGB argument
+        if args[1] in self.symbol_table:
+            if not self.symbol_table[args[1]]["initialized"]:
+                raise SyntaxError(f"Variable '{args[1]}' used without being initialized at line {token.line}")
+            rgb_values = self.symbol_table[args[1]]["value"]
+        else:
+            rgb_values = args[1]
+
+        # Validate RGB
+        try:
+            rgb_values = list(map(int, rgb_values.replace("\"", "").split(",")))
+            if len(rgb_values) != 3 or any(value < 0 or value > 255 for value in rgb_values):
+                raise SyntaxError(f"Invalid RGB values '{args[1]}' at line {token.line}. Expected format: \"r,g,b\" with values between 0 and 255.")
+        except ValueError:
+            raise SyntaxError(f"RGB values must be integers at line {token.line}.")
+
+        self.current_index += 1  # Skip RPAREN
+        self.skip_whiteline()
+
+        return {
+            "type": "win_command",
+            "command": command_name,
+            "dimensions": dimensions,
+            "rgb": rgb_values,
+        }
+
 
     def parse_draw_command(self):
         token = self.tokens[self.current_index]
@@ -739,8 +1032,42 @@ class Parser:
             "command": command_name,
             "args": args,
         }
+    
+    def parse_help(self):
+        """
+        Parses a help statement like:
+        help()
+        """
+        token = self.tokens[self.current_index]
+        if token.type != "HELP":
+            raise SyntaxError(f"Expected 'help', got {token.type} at line {token.line}")
 
+        command_name = token.value
+        self.current_index += 1
+        self.skip_only_whitespace()
 
+        # Check for opening parenthesis
+        if self.current_index >= len(self.tokens) or self.tokens[self.current_index].type != "LPAREN":
+            raise SyntaxError(f"Expected '(' after {command_name} at line {token.line}")
+
+        self.current_index += 1
+        self.skip_only_whitespace()
+
+        # Ensure no arguments are provided
+        if self.current_index < len(self.tokens) and self.tokens[self.current_index].type != "RPAREN":
+            raise SyntaxError(f"'help' does not accept any arguments at line {token.line}")
+
+        # Check for closing parenthesis
+        if self.current_index >= len(self.tokens) or self.tokens[self.current_index].type != "RPAREN":
+            raise SyntaxError(f"Expected ')' to close arguments for {command_name} at line {token.line}")
+
+        self.current_index += 1 
+        self.skip_whiteline()
+
+        return {
+            "type": "help",
+            "command": command_name,
+        }
 
     def parse_function_call(self):
         """
@@ -879,7 +1206,47 @@ class Parser:
                 self.skip_only_whitespace()
     
         return parameters
+    
 
+
+    def parse_function_parameters(self):
+        """
+        Parses the parameter list of a function declaration, e.g., (int x, string y).
+        Returns a list of tuples with parameter names and types.
+        """
+        parameters = []
+        while self.current_index < len(self.tokens) and self.tokens[self.current_index].type != "RPAREN":
+            type_token = self.tokens[self.current_index]
+            if type_token.type != "VARIABLE_DEF":
+                raise SyntaxError(f"Expected type (e.g., 'int', 'str', 'bool'), got '{type_token.value}' at line {type_token.line}")
+            param_type = type_token.value
+            self.current_index += 1
+
+            if self.current_index >= len(self.tokens) or self.tokens[self.current_index].type != "WHITESPACE":
+                raise SyntaxError(f"Missing argument after {type_token.value} at line {type_token.line}")
+        
+            self.skip_only_whitespace()
+
+            if self.current_index >= len(self.tokens) or self.tokens[self.current_index].type != "VARIABLE":
+                raise SyntaxError(f"Incorrect statement after {type_token.value} at line {type_token.line}")
+        
+            param_name_token = self.tokens[self.current_index]
+            parameters.append((param_name_token.value, param_type))
+            self.current_index += 1
+            self.skip_only_whitespace()
+
+            # Handle commas
+            if self.current_index < len(self.tokens) and self.tokens[self.current_index].type == "COMMA":
+                next_token = self.tokens[self.current_index + 1] if self.current_index + 1 < len(self.tokens) else None
+                if next_token.type == "RPAREN" or next_token.type == "COMMA":
+                    raise SyntaxError(f"Unexpected ',' at line {self.tokens[self.current_index].line}. Parameter expected after ','.")
+
+                self.current_index += 1
+                self.skip_only_whitespace()
+    
+        return parameters
+    
+    
 
     def parse_function_declaration(self):
         self.current_context = "FUNCTION_DECLARATION"
@@ -928,16 +1295,35 @@ class Parser:
         self.current_index += 1
         self.skip_whiteline()
 
-        body = self.parse_block()
+        body = self.parse_block()  # Parse the entire block
+
         self.skip_whiteline()
         if self.current_index >= len(self.tokens) or self.tokens[self.current_index].type != "RBRACE":
             raise SyntaxError(f"Expected '}}' after {func_name} declaration at line {token.line}")
         self.current_index += 1
         self.skip_whiteline()
 
-        # Validate return statement presence
-        found_return = any(statement.get("type") == "return" for statement in body)
-        if not found_return:
+        # Check for a return statement anywhere in the body
+        def has_return_statement(statements):
+            """
+            Recursively checks if the block contains at least one return statement.
+            """
+            for stmt in statements:
+                if stmt.get("type") == "return":
+                    return True
+                elif stmt.get("type") == "if":
+                    # Check both if and else bodies for returns
+                    if_body = stmt.get("body", [])
+                    else_body = stmt.get("else_body", [])
+                    if has_return_statement(if_body) or has_return_statement(else_body):
+                        return True
+                elif stmt.get("type") in {"while", "for", "elif", "else"}:
+                    # Check the loop body
+                    if has_return_statement(stmt.get("body", [])):
+                        return True
+            return False
+
+        if not has_return_statement(body):
             raise SyntaxError(f"Missing 'return' statement in function '{func_name}' at line {token.line}")
 
         # Restore global symbol table after parsing
@@ -956,7 +1342,6 @@ class Parser:
             "parameters": parameters,
             "body": body,
         }
-
 
 
     def tokens_to_string(self, tokens):
