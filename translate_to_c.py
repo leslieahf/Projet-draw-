@@ -1,7 +1,7 @@
-
+ 
 import re
 import code_to_insert
-
+ 
 def parse_or_variable(arg):
     """
     Si arg est un nombre littéral (ex: "100"), retourne int(arg).
@@ -13,7 +13,7 @@ def parse_or_variable(arg):
     if re.match(r'^-?\d+\.\d+$', arg):
         return float(arg)
     return arg  # identifiant de variable ou autre chaîne brute
-
+ 
 def get_printf_format_and_cast(variable, symbol_table):
     # (inchangé, c’est ton code existant)
     if (variable.startswith('"') and variable.endswith('"')) or \
@@ -23,7 +23,7 @@ def get_printf_format_and_cast(variable, symbol_table):
         return "%d" if "." not in variable else "%f", variable
     if variable in {"true", "false"}:
         return "%d", f"({variable} ? 1 : 0)"
-
+ 
     if variable not in symbol_table:
         raise ValueError(f"Variable '{variable}' not declared.")
     var_type = symbol_table[variable]["type"]
@@ -37,13 +37,13 @@ def get_printf_format_and_cast(variable, symbol_table):
         return "%s", f"&{variable}"
     else:
         raise ValueError(f"Unknown type for variable '{variable}'.")
-
+ 
 def translate_to_c(draw_code):
     """
     Gère aussi la déclaration de fonctions via 'func nom(...) { ... }'
     """
     symbol_table = {}
-
+ 
     # 1) On effectue d’abord des remplacements basiques sur tout le code
     draw_code = draw_code.replace(" <- ", " = ")\
                          .replace(" eq ", " == ")\
@@ -57,7 +57,7 @@ def translate_to_c(draw_code):
                          .replace(" <= ", " inf ")\
                          .replace(">", "sups")\
                          .replace(">=", "sup")
-
+ 
     # On sépare en lignes
     lines = draw_code.split("\n")
     
@@ -70,7 +70,7 @@ def translate_to_c(draw_code):
     in_func = False
     current_func_name = None
     current_func_buffer = []  # Pour accumuler le corps d’une fonction
-
+ 
     # Petite fonction utilitaire pour la traduction d'un print
     def translate_print(match,symbol_table):
         expr = match.group(1).strip()
@@ -84,7 +84,7 @@ def translate_to_c(draw_code):
         # Single token : variable ou littéral
             format_specifier, casted_variable = get_printf_format_and_cast(expr, symbol_table)
             return f'printf("{format_specifier}\\n", {casted_variable});'
-
+ 
     for line in lines:
         original_line = line.strip()
         
@@ -99,7 +99,7 @@ def translate_to_c(draw_code):
             return_type = "void"
             if "return 0" in draw_code:  # Simple détection, à améliorer si besoin
                 return_type = "int"
-
+ 
             if func_args == "":
                 functions_code.append(f"{return_type} {current_func_name}() {{")
             else:
@@ -114,10 +114,10 @@ def translate_to_c(draw_code):
                         raise ValueError(f"Invalid parameter declaration: '{param}'. Expected format 'type name'.")
                 c_args = ", ".join(params_c)
                 functions_code.append(f"{return_type} {current_func_name}({c_args}) {{")
-
+ 
             current_func_buffer = []
             continue
-
+ 
         # Détection de la fin d’une fonction : une ligne contenant seulement "}"
         if in_func and original_line == "}":
             # On ferme la fonction
@@ -133,7 +133,7 @@ def translate_to_c(draw_code):
             current_func_buffer = []
             current_func_name = None
             continue
-
+ 
         # Si on est à l’intérieur d’une fonction, on accumule les lignes
         if in_func:
             # Ici, on peut réutiliser la logique existante de traduction,
@@ -147,7 +147,11 @@ def translate_to_c(draw_code):
             # On est en dehors d’une fonction : on applique la même logique de traduction
             translated_line = line_translator(line, functions_code, translate_print,window_created,symbol_table,global_functions)
             main_code.extend(translated_line)
-
+ 
+        if code_to_insert.check_comment_in_code(functions_code, "draw") == 1:
+            if code_to_insert.check_comment_in_code(functions_code, "// Garder la fenêtre ouverte en permanence avec une boucle événementielle") == 0:
+                code_to_insert.insert_code_before_first_occurrence(functions_code, "return 0;", code_to_insert.code_staywindow_open)
+ 
     # Maintenant qu’on a séparé le code des fonctions et le code de main(),
     # on assemble le code final
     c_code = []
@@ -157,11 +161,11 @@ def translate_to_c(draw_code):
     c_code.append("#include <stdbool.h>")
     c_code.append("#include <SDL2/SDL_ttf.h>")
     c_code.append("#include <math.h>\n")
-
+ 
     c_code.extend(global_functions)
     # Ajout des fonctions avant le main
     c_code.extend(functions_code)
-
+ 
     # Début du main
     c_code.append("int main() {\n")
     # On met le code du main avec indentation
@@ -169,14 +173,15 @@ def translate_to_c(draw_code):
         c_code.append("    " + line)
     # On termine
     if code_to_insert.check_comment_in_code(c_code, "//Create window") == 1:
-        code_to_insert.insert_code_if_comment_not_present(c_code, code_to_insert.code_staywindow_open, "// Garder la fenêtre ouverte en permanence avec une boucle événementielle")
+        if code_to_insert.check_comment_in_code(c_code, "// Garder la fenêtre ouverte en permanence avec une boucle événementielle") == 0:
+            code_to_insert.insert_code_if_comment_not_present(c_code, code_to_insert.code_staywindow_open, "// Garder la fenêtre ouverte en permanence avec une boucle événementielle")
     c_code.append("    return 0;")
     c_code.append("}\n")
-
+ 
     # On joint tout
     return "\n".join(c_code)
-
-
+ 
+ 
 def line_translator(line,functions_code,translate_print,window_created,symbol_table,global_functions):
     """
     Traduit **une** ligne de draw++ en une ou plusieurs lignes de C.
@@ -187,7 +192,7 @@ def line_translator(line,functions_code,translate_print,window_created,symbol_ta
     """
     line = line.strip()
     result_lines = []
-
+ 
     # Exemple : si la ligne commence par "freedraw", etc. on gère
     # Ici, je prends des extraits de ton code existant et je simplifie.
     if line.startswith("freedraw"):
@@ -202,8 +207,22 @@ def line_translator(line,functions_code,translate_print,window_created,symbol_ta
             # Traiter chaque argument
             shape = raw_args[0].strip()  # Premier argument : le type de forme (carre)
             # Deuxième argument : couleur RGB (chaîne sous forme "255, 255, 255")
-            couleur_raw = raw_args[1].strip("\"")  # Enlever les guillemets autour de la couleur
-            couleur = tuple(map(int, map(str.strip, couleur_raw.split(","))))  # Convertir en tuple d'entiers
+            couleur_raw = raw_args[1].strip("\"")
+            resolved_couleur = []
+
+            for part in couleur_raw.split(","):
+                part = part.strip()
+                if re.match(r'^[a-zA-Z_]\w*$', part):  # Vérifie si c'est une variable
+                    if part not in symbol_table:
+                        raise ValueError(f"Variable '{part}' not declared.")
+                    resolved_couleur.append(symbol_table[part]["value"])  # Récupère la valeur de la variable
+                elif re.match(r'^-?\d+$', part):  # Vérifie si c'est un entier
+                    resolved_couleur.append(int(part))
+                else:
+                    raise ValueError(f"Invalid RGB component: '{part}'. Expected a variable or an integer.")
+
+            # Convertir la liste en tuple
+            couleur = tuple(resolved_couleur)
             r, g, b = couleur   # Extraire les couleurs RGB
         
             if not window_created[0]:
@@ -319,8 +338,19 @@ def line_translator(line,functions_code,translate_print,window_created,symbol_ta
                 result_lines.append("// Paramètres pour le line:")
                 result_lines.extend(parametres_line)
     elif line.startswith("window"):
-        # gère la fenêtre
-        result_lines.append("// window(...) - idem")
+      # Extraire les informations entre les parenthèses
+        arguments = line[line.find("(") + 1: line.rfind(")")]
+        coordonnees, x, y, r, g, b = code_to_insert.extract_window_params(arguments)
+        # Préparer les paramètres pour la fenêtre
+        parametres_window = code_to_insert.get_parametres_window(x, y, r, g, b)
+        # Mode dimensions personnalisées
+        if not code_to_insert.check_comment_in_code(global_functions, "//Create window custom"):
+            global_functions.append("//Create window custom")
+            global_functions.extend(code_to_insert.code_create_window_modify)
+            global_functions.append("// Garder la fenêtre ouverte")
+            global_functions.extend(code_to_insert.code_staywindow_open)
+        result_lines.append("// Paramètres pour la fenêtre avec dimensions personnalisées :")
+        result_lines.extend(parametres_window)
     elif line.startswith("call "):
         # Appel de fonction
         match_call = re.match(r'^call\s+([a-zA-Z_]\w*)\s*\((.*)\)$', line)
@@ -344,7 +374,7 @@ def line_translator(line,functions_code,translate_print,window_created,symbol_ta
         left_side, right_side = line.split("=", 1)
         var_name = left_side.strip()
         value = right_side.strip()
-
+ 
         # Vérifier si la valeur est une expression
         if re.search(r'[+\-*/]', value):
             terms = re.split(r'([+\-*/])', value)
@@ -373,19 +403,21 @@ def line_translator(line,functions_code,translate_print,window_created,symbol_ta
                 raise ValueError(f"Variable '{value}' not declared.")
             var_type = symbol_table[value]["type"]
             result_lines.append(f"{var_type} {var_name} = {value};")
-
+ 
         # Mettre à jour la symbol_table avec la nouvelle variable
         symbol_table[var_name] = {"type": var_type}
-
-
+ 
+ 
     elif line.startswith("print"):
         line = re.sub(r'print\((.+?)\)',
                       lambda m: translate_print(m, symbol_table),
                       line)
         result_lines.append(line + ";")
-
+ 
     else:
         # Par défaut, on laisse la ligne telle quelle
         result_lines.append(line)
-
+ 
     return result_lines
+ 
+ 
