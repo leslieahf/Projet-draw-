@@ -53,8 +53,8 @@ def translate_to_c(draw_code):
                          .replace("true", "1")\
                          .replace("false", "0")
     # Remplacement plus spécifique (à adapter selon tes besoins)
-    draw_code = draw_code.replace("<", "infs")\
-                         .replace(" <= ", " inf ")\
+    draw_code = draw_code.replace("infs", "<")\
+                         .replace("inf", "<=")\
                          .replace(">", "sups")\
                          .replace(">=", "sup")
  
@@ -95,13 +95,13 @@ def translate_to_c(draw_code):
             in_func = True
             current_func_name = match_func_start.group(1)
             func_args = match_func_start.group(2).strip()
-            
+
             return_type = "void"
             if "return 0" in draw_code:  # Simple détection, à améliorer si besoin
                 return_type = "int"
- 
+
             if func_args == "":
-                functions_code.append(f"{return_type} {current_func_name}() {{")
+                functions_code.append(f"{return_type} {current_func_name}(SDL_Renderer* renderer) {{")
             else:
                 arg_list = [arg.strip() for arg in func_args.split(",") if arg.strip()]
                 params_c = []
@@ -113,8 +113,9 @@ def translate_to_c(draw_code):
                     except ValueError:
                         raise ValueError(f"Invalid parameter declaration: '{param}'. Expected format 'type name'.")
                 c_args = ", ".join(params_c)
-                functions_code.append(f"{return_type} {current_func_name}({c_args}) {{")
- 
+                functions_code.append(f"{return_type} {current_func_name}(SDL_Renderer* renderer, {c_args}) {{")
+
+        
             current_func_buffer = []
             continue
  
@@ -148,9 +149,6 @@ def translate_to_c(draw_code):
             translated_line = line_translator(line, functions_code, translate_print,window_created,symbol_table,global_functions)
             main_code.extend(translated_line)
  
-        if code_to_insert.check_comment_in_code(functions_code, "draw") == 1:
-            if code_to_insert.check_comment_in_code(functions_code, "// Garder la fenêtre ouverte en permanence avec une boucle événementielle") == 0:
-                code_to_insert.insert_code_before_first_occurrence(functions_code, "return 0;", code_to_insert.code_staywindow_open)
  
     # Maintenant qu’on a séparé le code des fonctions et le code de main(),
     # on assemble le code final
@@ -161,6 +159,8 @@ def translate_to_c(draw_code):
     c_code.append("#include <stdbool.h>")
     c_code.append("#include <SDL2/SDL_ttf.h>")
     c_code.append("#include <math.h>\n")
+    c_code.append("bool window_created = false;\n")
+
  
     c_code.extend(global_functions)
     # Ajout des fonctions avant le main
@@ -168,13 +168,16 @@ def translate_to_c(draw_code):
  
     # Début du main
     c_code.append("int main() {\n")
+    if not window_created[0]:
+                c_code.append("// Création de la fenêtre")
+                c_code.extend(code_to_insert.code_create_window)
+                c_code.append("    window_created = true;")
+                window_created[0] = True 
     # On met le code du main avec indentation
     for line in main_code:
         c_code.append("    " + line)
     # On termine
-    if code_to_insert.check_comment_in_code(c_code, "//Create window") == 1:
-        if code_to_insert.check_comment_in_code(c_code, "// Garder la fenêtre ouverte en permanence avec une boucle événementielle") == 0:
-            code_to_insert.insert_code_if_comment_not_present(c_code, code_to_insert.code_staywindow_open, "// Garder la fenêtre ouverte en permanence avec une boucle événementielle")
+    code_to_insert.insert_code_if_comment_not_present(c_code, code_to_insert.code_staywindow_open, "// Garder la fenêtre ouverte en permanence avec une boucle événementielle")
     c_code.append("    return 0;")
     c_code.append("}\n")
  
@@ -225,10 +228,7 @@ def line_translator(line,functions_code,translate_print,window_created,symbol_ta
             couleur = tuple(resolved_couleur)
             r, g, b = couleur   # Extraire les couleurs RGB
         
-            if not window_created[0]:
-                result_lines.append("// Création de la fenêtre")
-                result_lines.extend(code_to_insert.code_create_window)
-                window_created[0] = True  
+            
             if "carre" in line:
                 # Troisième argument : coordonnées (x, y) sous forme "10,10"
                 coordonnees_raw = raw_args[2].strip("\"")  # Enlever les guillemets autour des coordonnées
@@ -245,19 +245,20 @@ def line_translator(line,functions_code,translate_print,window_created,symbol_ta
                 # Troisième argument : coordonnées (x, y) sous forme "10,10"
                 coordonnees_raw = raw_args[2].strip("\"")  # Enlever les guillemets autour des coordonnées
                 coordonnees = tuple(map(int, map(str.strip, coordonnees_raw.split(","))))  # Convertir en tuple d'entiers
-                taille = int(raw_args[3])
+                hauteur = parse_or_variable((raw_args[3]))
+                largeur = parse_or_variable(raw_args[4])
                 x, y = coordonnees  # Extraire les coordonnées
                 if not code_to_insert.check_comment_in_code(global_functions, "void drawRectangle"):
                     global_functions.append("// Définition de la fonction drawRectangle")
                     global_functions.extend(code_to_insert.code_drawRectangle)
-                parametres_rectangle = code_to_insert.get_parametres_rectangle(x, y, taille, r, g, b)
+                parametres_rectangle = code_to_insert.get_parametres_rectangle(x, y, hauteur ,largeur, r, g, b)
                 result_lines.append("// Paramètres pour le rectangle :")
                 result_lines.extend(parametres_rectangle)
             elif "cercle" in line:
                 # Troisième argument : coordonnées (x, y) sous forme "10,10"
                 coordonnees_raw = raw_args[2].strip("\"")  # Enlever les guillemets autour des coordonnées
                 coordonnees = tuple(coord.strip() for coord in coordonnees_raw.split(","))  # Conserver les valeurs telles quelles
-                taille = int(raw_args[3])
+                taille = parse_or_variable(raw_args[3])
                 x, y = coordonnees  # Extraire les coordonnées (elles restent des chaînes pour permettre des variables comme "i")
                 if not code_to_insert.check_comment_in_code(global_functions, "void drawCercle"):
                     global_functions.append("// Définition de la fonction drawCercle")
@@ -284,9 +285,9 @@ def line_translator(line,functions_code,translate_print,window_created,symbol_ta
                 # Troisième argument : coordonnées (x, y) sous forme "10,10"
                 coordonnees_raw = raw_args[2].strip("\"")  # Enlever les guillemets autour des coordonnées
                 coordonnees = tuple(map(int, map(str.strip, coordonnees_raw.split(","))))  # Convertir en tuple d'entiers
-                taille = int(raw_args[3])
+                taille = parse_or_variable(raw_args[3])
                 x, y = coordonnees  # Extraire les coordonnées
-                types_polygon = int(raw_args[4])
+                types_polygon = parse_or_variable(raw_args[4])
                 if not code_to_insert.check_comment_in_code(global_functions, "void drawPolygon"):
                     global_functions.append("// Définition de la fonction drawPolygon")
                     global_functions.extend(code_to_insert.code_drawPolygon)
@@ -298,8 +299,8 @@ def line_translator(line,functions_code,translate_print,window_created,symbol_ta
                 coordonnees_raw = raw_args[2].strip("\"")  # Enlever les guillemets autour des coordonnées
                 coordonnees = tuple(map(int, map(str.strip, coordonnees_raw.split(","))))  # Convertir en tuple d'entiers
                 x, y = coordonnees  # Extraire les coordonnées
-                largeur=int(raw_args[3])
-                hauteur=int(raw_args[4])
+                largeur=parse_or_variable(raw_args[3])
+                hauteur=parse_or_variable(raw_args[4])
                 if not code_to_insert.check_comment_in_code(global_functions, "void drawLosange"):
                     global_functions.append("// Définition de la fonction drawLosange")
                     global_functions.extend(code_to_insert.code_drawLosange)
@@ -312,9 +313,9 @@ def line_translator(line,functions_code,translate_print,window_created,symbol_ta
                 coordonnees = tuple(map(int, map(str.strip, coordonnees_raw.split(","))))  # Convertir en tuple d'entiers
                 x, y = coordonnees  # Extraire les coordonnées
                 # Extraction des arguments
-                largeur_haut = int(raw_args[3])
-                largeur_bas = int(raw_args[4])
-                hauteur = int(raw_args[5])
+                largeur_haut = parse_or_variable(raw_args[3])
+                largeur_bas = parse_or_variable(raw_args[4])
+                hauteur = parse_or_variable(raw_args[5])
                 r, g, b = couleur  # Couleur RGB
                 # Insérer le code pour dessiner le trapèze
                 if not code_to_insert.check_comment_in_code(global_functions, "void drawTrapeze"):
@@ -344,23 +345,22 @@ def line_translator(line,functions_code,translate_print,window_created,symbol_ta
         # Préparer les paramètres pour la fenêtre
         parametres_window = code_to_insert.get_parametres_window(x, y, r, g, b)
         # Mode dimensions personnalisées
-        if not code_to_insert.check_comment_in_code(global_functions, "//Create window custom"):
-            global_functions.append("//Create window custom")
-            global_functions.extend(code_to_insert.code_create_window_modify)
-            global_functions.append("// Garder la fenêtre ouverte")
-            global_functions.extend(code_to_insert.code_staywindow_open)
         result_lines.append("// Paramètres pour la fenêtre avec dimensions personnalisées :")
         result_lines.extend(parametres_window)
+        if not code_to_insert.check_comment_in_code(result_lines, "//Create window custom"):
+            result_lines.append("//Create window custom")
+            result_lines.extend(code_to_insert.code_create_window_modify)
+        window_created[0] = True
+        result_lines.append("    window_created = true;")
     elif line.startswith("call "):
-        # Appel de fonction
         match_call = re.match(r'^call\s+([a-zA-Z_]\w*)\s*\((.*)\)$', line)
         if match_call:
             function_name = match_call.group(1)
             args = match_call.group(2).strip()
             if args == "":
-                result_lines.append(f"{function_name}();")
+                result_lines.append(f"{function_name}(renderer);")
             else:
-                result_lines.append(f"{function_name}({args});")
+                result_lines.append(f"{function_name}(renderer, {args});")
         else:
             # version sans parenthèses ?
             match_call_no_paren = re.match(r'^call\s+([a-zA-Z_]\w*)$', line)
