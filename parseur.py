@@ -396,7 +396,6 @@ class Parser:
         if self.current_index >= len(self.tokens) or self.tokens[self.current_index].type != "RPAREN":
             raise SyntaxError(f"Expected ')' after print expression at line {token.line}")
         
-        # Validation des variables dans le print
         if len(expression) == 0 or all(tok.type == "WHITESPACE" for tok in expression):
             raise SyntaxError(f"Missing arguments in print expression at line {token.line}")
 
@@ -418,7 +417,6 @@ class Parser:
 
         if self.context1 == 0 and self.context2 == 0  :
             raise SyntaxError(f"'else' must follow 'if' or 'elif' statement at line {token.line}")
-        
         
         self.current_index += 1
         self.skip_whiteline()
@@ -451,13 +449,11 @@ class Parser:
 
         self.current_index += 1
 
-        # Vérifie la parenthèse ouvrante après le IF
         self.skip_whiteline()
         if self.current_index >= len(self.tokens) or self.tokens[self.current_index].type != "LPAREN":
             raise SyntaxError(f"Expected '(' after if at line {token.line}")
         self.skip_only_whitespace()
 
-        # Parse la condition entre les parenthèses
         condition = self.parse_expression()
 
         self.skip_only_whitespace()
@@ -473,7 +469,6 @@ class Parser:
             if tok.type == "VARIABLE" and tok.value not in self.symbol_table:
                 raise SyntaxError(f"'{tok.value}' used without being initialized at line {tok.line}")
 
-        # Gérer les espaces et sauts de ligne avant le crochet ouvrant
         while self.current_index < len(self.tokens) and self.tokens[self.current_index].type in {"WHITESPACE", "NEWLINE"}:
             self.current_index += 1
 
@@ -483,7 +478,6 @@ class Parser:
         self.current_index += 1
         self.skip_whiteline()
 
-        # Parse le corps du bloc
         body = self.parse_block()
         self.context1 = 1
         self.context2 = 0
@@ -512,13 +506,12 @@ class Parser:
 
         self.current_index += 1
 
-        # Vérifie la parenthèse ouvrante après le ELIF
         self.skip_whiteline()
         if self.current_index >= len(self.tokens) or self.tokens[self.current_index].type != "LPAREN":
             raise SyntaxError(f"Expected '(' after elif at line {token.line}")
         self.skip_only_whitespace()
 
-        # Parse la condition entre les parenthèses
+        # Parse the condition
         condition = self.parse_expression()
 
         self.skip_only_whitespace()
@@ -534,7 +527,7 @@ class Parser:
             if tok.type == "VARIABLE" and tok.value not in self.symbol_table:
                 raise SyntaxError(f"'{tok.value}' used without being initialized at line {tok.line}")
 
-        # Gérer les espaces et sauts de ligne avant le crochet ouvrant
+        # Manage spaces and line breaks before the opening parenthesis
         while self.current_index < len(self.tokens) and self.tokens[self.current_index].type in {"WHITESPACE", "NEWLINE"}:
             self.current_index += 1
 
@@ -759,7 +752,6 @@ class Parser:
         self.current_index += 1
         self.skip_whiteline()
 
-        # Parse le corps du bloc
         body = self.parse_block()
         self.skip_whiteline()
         if self.current_index >= len(self.tokens) or self.tokens[self.current_index].type != "RBRACE":
@@ -814,33 +806,50 @@ class Parser:
             raise SyntaxError(f"Invalid number of arguments for 'win' at line {token.line}. Expected 2 arguments (\"width,height\", \"r,g,b\").")
 
         # Resolve dimensions argument
-        if args[0] in self.symbol_table:
-            if not self.symbol_table[args[0]]["initialized"]:
-                raise SyntaxError(f"Variable '{args[0]}' used without being initialized at line {token.line}")
-            dimensions = self.symbol_table[args[0]]["value"]
+        dimensions_arg = args[0]
+        if dimensions_arg in self.symbol_table:
+            # Variable trouvée dans la table des symboles
+            var_info = self.symbol_table[dimensions_arg]
+            if not var_info["initialized"]:
+                raise SyntaxError(f"Variable '{dimensions_arg}' used without being initialized at line {token.line}")
+            if var_info["type"] != "STRING":
+                raise SyntaxError(f"Variable '{dimensions_arg}' must be a STRING at line {token.line}")
+            dimensions = var_info["value"]
         else:
-            dimensions = args[0]
+            # Vérifie si c'est une chaîne littérale
+            if not isinstance(dimensions_arg, str) or not dimensions_arg.startswith("\"") or not dimensions_arg.endswith("\""):
+                raise SyntaxError(f"Invalid argument '{dimensions_arg}' at line {token.line}. Expected a STRING or initialized variable.")
+            dimensions = dimensions_arg
 
-        # Validate dimensions
+        # Valider les dimensions
         dimensions = dimensions.replace("\"", "").split(",")
-        if len(dimensions) != 2 or not all(dim.isdigit() for dim in dimensions):
+        if len(dimensions) != 2 or not all(dim.strip().isdigit() for dim in dimensions):
             raise SyntaxError(f"Invalid dimensions '{args[0]}' at line {token.line}. Expected format: \"width,height\" with positive integers.")
 
         # Resolve RGB argument
-        if args[1] in self.symbol_table:
-            if not self.symbol_table[args[1]]["initialized"]:
-                raise SyntaxError(f"Variable '{args[1]}' used without being initialized at line {token.line}")
-            rgb_values = self.symbol_table[args[1]]["value"]
+        rgb_arg = args[1]
+        if rgb_arg in self.symbol_table:
+            # if it's a variable found into the symbol_table
+            var_info = self.symbol_table[rgb_arg]
+            if not var_info["initialized"]:
+                raise SyntaxError(f"Variable '{rgb_arg}' used without being initialized at line {token.line}")
+            if var_info["type"] != "STRING":
+                raise SyntaxError(f"Variable '{rgb_arg}' must be a STRING at line {token.line}")
+            rgb_values = var_info["value"]
         else:
-            rgb_values = args[1]
+            # Check if it's an str
+            if not isinstance(rgb_arg, str) or not rgb_arg.startswith("\"") or not rgb_arg.endswith("\""):
+                raise SyntaxError(f"Invalid argument '{rgb_arg}' at line {token.line}. Expected a STRING or initialized variable.")
+            rgb_values = rgb_arg
 
-        # Validate RGB
+        #Validate RGB values
         try:
             rgb_values = list(map(int, rgb_values.replace("\"", "").split(",")))
             if len(rgb_values) != 3 or any(value < 0 or value > 255 for value in rgb_values):
                 raise SyntaxError(f"Invalid RGB values '{args[1]}' at line {token.line}. Expected format: \"r,g,b\" with values between 0 and 255.")
         except ValueError:
             raise SyntaxError(f"RGB values must be integers at line {token.line}.")
+
 
         self.current_index += 1  # Skip RPAREN
         self.skip_whiteline()
@@ -893,6 +902,9 @@ class Parser:
         self.current_index += 1  # Skip RPAREN
         self.skip_whiteline()
 
+        
+
+
         if command_name == "draw":
             # Specify number of arguments excepted 
             expected_shapes = {
@@ -906,30 +918,39 @@ class Parser:
                 "trapeze": 6    
             }
 
+            
             shape = args[0]
             if shape not in expected_shapes:
                 raise SyntaxError(f"Invalid shape '{shape}' for 'draw' at line {token.line}. Expected one of {', '.join(expected_shapes.keys())}.")
+            
+            # Validate number  arguments
+            expected_arg_count = expected_shapes[shape]
+            if expected_arg_count is not None and len(args) != expected_arg_count:
+                raise SyntaxError(f"Invalid number of arguments for shape '{shape}' at line {token.line}. Expected {expected_arg_count}, got {len(args)}.")
+            
+            rgb_arg = args[1]
+            if rgb_arg in self.symbol_table:
+                # if it's a variable found into the symbol_table
+                var_info = self.symbol_table[rgb_arg]
+                if not var_info["initialized"]:
+                    raise SyntaxError(f"Variable '{rgb_arg}' used without being initialized at line {token.line}")
+                if var_info["type"] != "STRING":
+                    raise SyntaxError(f"Variable '{rgb_arg}' must be a STRING at line {token.line}")
+                rgb_values = var_info["value"]
+            else:
+                # Check if it's an str
+                if not isinstance(rgb_arg, str) or not rgb_arg.startswith("\"") or not rgb_arg.endswith("\""):
+                    raise SyntaxError(f"Invalid argument '{rgb_arg}' at line {token.line}. Expected a STRING or initialized variable.")
+                rgb_values = rgb_arg
 
-            # Check that RGB is valid
-            rgb = args[1]
+            #Validate RGB values
             try:
-                if "," in rgb:
-                    # Case: RGB is a string like "255,0,128"
-                    rgb_values = list(map(int, rgb.replace("\"", "").split(",")))
-                elif rgb in self.symbol_table:
-                    # Case: RGB is a variable
-                    rgb_value = self.symbol_table[rgb]["value"]
-                    if not isinstance(rgb_value, str) or "," not in rgb_value:
-                        raise SyntaxError(f"Variable '{rgb}' must contain a string in 'R,G,B' format at line {token.line}.")
-                    rgb_values = list(map(int, rgb_value.split(",")))
-                else:
-                    raise SyntaxError(f"Invalid RGB argument '{rgb}' at line {token.line}. Expected 'R,G,B' or an initialized variable.")
-
-                # Validate the RGB values
+                rgb_values = list(map(int, rgb_values.replace("\"", "").split(",")))
                 if len(rgb_values) != 3 or any(value < 0 or value > 255 for value in rgb_values):
-                    raise SyntaxError(f"Invalid RGB values '{rgb}' at line {token.line}. Expected format: 'R,G,B' with values between 0 and 255.")
+                    raise SyntaxError(f"Invalid RGB values '{args[1]}' at line {token.line}. Expected format: \"r,g,b\" with values between 0 and 255.")
             except ValueError:
                 raise SyntaxError(f"RGB values must be integers at line {token.line}.")
+
             
             if not (shape == "line" or shape == "triangle"):
                 arg = args[2]  # Directly access the third argument
@@ -1017,11 +1038,6 @@ class Parser:
                         # Cas : Argument invalide
                         raise SyntaxError(f"Invalid argument '{arg}' at line {token.line}. Expected an integer or initialized variable.")
             
-            # Validate remaining arguments
-            expected_arg_count = expected_shapes[shape]
-            if expected_arg_count is not None and len(args) != expected_arg_count:
-                raise SyntaxError(f"Invalid number of arguments for shape '{shape}' at line {token.line}. Expected {expected_arg_count}, got {len(args)}.")
-            
                 
         elif command_name == "freedraw":
             if args:
@@ -1032,7 +1048,7 @@ class Parser:
             "command": command_name,
             "args": args,
         }
-    
+        
     def parse_help(self):
         """
         Parses a help statement like:
