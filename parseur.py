@@ -537,7 +537,6 @@ class Parser:
         self.current_index += 1
         self.skip_whiteline()
 
-        # Parse le corps du bloc
         body = self.parse_block()
         self.context1 = 0
         self.context2 = 1
@@ -808,7 +807,7 @@ class Parser:
         # Resolve dimensions argument
         dimensions_arg = args[0]
         if dimensions_arg in self.symbol_table:
-            # Variable trouvée dans la table des symboles
+
             var_info = self.symbol_table[dimensions_arg]
             if not var_info["initialized"]:
                 raise SyntaxError(f"Variable '{dimensions_arg}' used without being initialized at line {token.line}")
@@ -816,12 +815,12 @@ class Parser:
                 raise SyntaxError(f"Variable '{dimensions_arg}' must be a STRING at line {token.line}")
             dimensions = var_info["value"]
         else:
-            # Vérifie si c'est une chaîne littérale
+            # Check if it's an str
             if not isinstance(dimensions_arg, str) or not dimensions_arg.startswith("\"") or not dimensions_arg.endswith("\""):
                 raise SyntaxError(f"Invalid argument '{dimensions_arg}' at line {token.line}. Expected a STRING or initialized variable.")
             dimensions = dimensions_arg
 
-        # Valider les dimensions
+        # Validate the dimensions
         dimensions = dimensions.replace("\"", "").split(",")
         if len(dimensions) != 2 or not all(dim.strip().isdigit() for dim in dimensions):
             raise SyntaxError(f"Invalid dimensions '{args[0]}' at line {token.line}. Expected format: \"width,height\" with positive integers.")
