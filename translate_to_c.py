@@ -4,9 +4,9 @@ import code_to_insert
  
 def parse_or_variable(arg):
     """
-    Si arg est un nombre littéral (ex: "100"), retourne int(arg).
-    Si c'est un float littéral (ex: "3.14"), retourne float(arg).
-    Sinon, c'est un nom de variable => retourne la chaîne telle quelle.
+    If arg is a literal number (e.g., "100"), return int(arg).
+    If it's a literal float (e.g., "3.14"), return float(arg).
+    Otherwise, it's a variable name => return the string as-is.
     """
     if re.match(r'^-?\d+$', arg):
         return int(arg)
@@ -15,7 +15,6 @@ def parse_or_variable(arg):
     return arg  # identifiant de variable ou autre chaîne brute
  
 def get_printf_format_and_cast(variable, symbol_table):
-    # (inchangé, c’est ton code existant)
     if (variable.startswith('"') and variable.endswith('"')) or \
        (variable.startswith("'") and variable.endswith("'")):
         return "%s", variable
@@ -40,64 +39,63 @@ def get_printf_format_and_cast(variable, symbol_table):
  
 def translate_to_c(draw_code):
     """
-    Gère aussi la déclaration de fonctions via 'func nom(...) { ... }'
+    Handles function declarations via 'func name(...) { ... }'.
     """
     symbol_table = {}
  
-    # 1) On effectue d’abord des remplacements basiques sur tout le code
+     # First, perform basic replacements across the entire code
     draw_code = draw_code.replace(" <- ", " = ")\
                          .replace(" eq ", " == ")\
                          .replace(" neq ", " != ")\
                          .replace("and", "&&")\
                          .replace(" or ", " || ")\
                          .replace("true", "1")\
-                         .replace("false", "0")
-    # Remplacement plus spécifique (à adapter selon tes besoins)
-    draw_code = draw_code.replace("infs", "<")\
+                         .replace("false", "0")\
+                         .replace("infs", "<")\
                          .replace("inf", "<=")\
                          .replace(">", "sups")\
                          .replace(">=", "sup")
  
-    # On sépare en lignes
+    # Split into lines
     lines = draw_code.split("\n")
     
-    # Buffers de code :
+    # Code buffers:
     global_functions = []
-    functions_code = []  # Ici on va stocker la traduction des fonctions
-    main_code = []       # Ici on va stocker la traduction de ce qui va dans main()
+    functions_code = []  # Store translated functions
+    main_code = []       # Store the translation of what goes into main()
     window_created = [False]
-    # Variable pour savoir si on est “en train” de capturer le contenu d’une fonction
+    # Variable to track if we are “inside” a function body
     in_func = False
     current_func_name = None
-    current_func_buffer = []  # Pour accumuler le corps d’une fonction
+    current_func_buffer = []  # To accumulate the function body
  
-    # Petite fonction utilitaire pour la traduction d'un print
+    # Small utility function for translating a print
     def translate_print(match,symbol_table):
         expr = match.group(1).strip()
     
-    # Détection simple
+   # Simple detection
         if re.search(r'[+\-*/]', expr):
-        # C'est une petite expression : print(a+b)
-        # On suppose tout en int pour l'exemple
+        # It's a small expression: print(a+b)
+        # Assume everything as int for this example
             return f'printf("%d\\n", {expr});'
         else:
-        # Single token : variable ou littéral
+         # Single token: variable or literal
             format_specifier, casted_variable = get_printf_format_and_cast(expr, symbol_table)
             return f'printf("{format_specifier}\\n", {casted_variable});'
  
     for line in lines:
         original_line = line.strip()
         
-        # Détection du début d’une fonction : ex "func maFonction( x, y ) {"
+        # Detect the start of a function: e.g., "func myFunction( x, y ) {"
         match_func_start = re.match(r'^func\s+([a-zA-Z_]\w*)\s*\((.*?)\)\s*\{', original_line)
         if match_func_start:
-            # On entre dans une fonction
+            # We enter a function
             in_func = True
             current_func_name = match_func_start.group(1)
             func_args = match_func_start.group(2).strip()
 
             return_type = "void"
-            if "return 0" in draw_code:  # Simple détection, à améliorer si besoin
+            if "return 0" in draw_code:  
                 return_type = "int"
 
             if func_args == "":
@@ -119,41 +117,41 @@ def translate_to_c(draw_code):
             current_func_buffer = []
             continue
  
-        # Détection de la fin d’une fonction : une ligne contenant seulement "}"
+        # Detect the end of a function: a line containing only "}"
         if in_func and original_line == "}":
-            # On ferme la fonction
+            # Close the function
             in_func = False
-            # On ajoute toutes les lignes traduites qu’on a accumulées
+            # Add all translated lines accumulated
             for func_line in current_func_buffer:
-                # Vérifiez si la ligne contient un return sans point-virgule
+                # Check if the line contains a return without a semicolon
                 if func_line.strip().startswith("return") and not func_line.strip().endswith(";"):
-                    func_line += ";"  # Ajoutez le point-virgule manquant
+                    func_line += ";"  
                 functions_code.append("    " + func_line)
-            # Fermeture de la fonction
+             # Close the function
             functions_code.append("}\n")
             current_func_buffer = []
             current_func_name = None
             continue
  
-        # Si on est à l’intérieur d’une fonction, on accumule les lignes
+          # If inside a function, accumulate lines
         if in_func:
-            # Ici, on peut réutiliser la logique existante de traduction,
-            # mais on l’applique à current_func_buffer au lieu de main_code.
+            # Here, reuse the existing translation logic,
+            # but apply it to current_func_buffer instead of main_code.
             
             translated_line = line_translator(line, translate_print,window_created,symbol_table,global_functions)
-            # On stocke le résultat
+            # Store the result
             current_func_buffer.extend(translated_line)
         
         else:
-            # On est en dehors d’une fonction : on applique la même logique de traduction
+            # Outside of a function: apply the same translation logic
             translated_line = line_translator(line,translate_print,window_created,symbol_table,global_functions)
             main_code.extend(translated_line)
  
  
-    # Maintenant qu’on a séparé le code des fonctions et le code de main(),
-    # on assemble le code final
+     # Now that we’ve separated function code and main() code,
+    # assemble the final code
     c_code = []
-    # Inclusions standard
+     # Standard includes
     c_code.append("#include <SDL2/SDL.h>")
     c_code.append("#include <stdio.h>")
     c_code.append("#include <stdbool.h>")
@@ -163,26 +161,24 @@ def translate_to_c(draw_code):
 
  
     c_code.extend(global_functions)
-    # Ajout des fonctions avant le main
+    # Add functions before the main
     c_code.extend(functions_code)
  
-    # Début du main
+    # Start main
     c_code.append("int main() {\n")
     if not window_created[0]:
                 c_code.append("// Création de la fenêtre")
                 c_code.extend(code_to_insert.code_create_window)
                 c_code.append("    window_created = true;")
                 window_created[0] = True 
-    # On met le code du main avec indentation
+    # Add main code with indentation
     for line in main_code:
         c_code.append("    " + line)
-    # On termine
-    if code_to_insert.check_comment_in_code(c_code, "// Garder la fenêtre ouverte en permanence avec une boucle événementielle") == 0:
-        code_to_insert.insert_code_if_comment_not_present(c_code, code_to_insert.code_staywindow_open, "// Garder la fenêtre ouverte en permanence avec une boucle événementielle")
+   # End
+    
+    code_to_insert.insert_code_if_comment_not_present(c_code, code_to_insert.code_staywindow_open, "// Garder la fenêtre ouverte en permanence avec une boucle événementielle")
     c_code.append("    return 0;")
     c_code.append("}\n")
- 
-    # On joint tout
     return "\n".join(c_code)
  
  
@@ -190,45 +186,45 @@ def line_translator(line,translate_print,window_created,symbol_table,global_func
     line = line.strip()
     result_lines = []
  
-    # Exemple : si la ligne commence par "freedraw", etc. on gère
-    # Ici, je prends des extraits de ton code existant et je simplifie.
+   # Example: if the line starts with "freedraw", handle it
+    # Here, I use excerpts from your existing code and simplify.
     if line.startswith("freedraw"):
         result_lines.append("// Freedraw: insertion du code_instructions_freedraw")
         global_functions.extend(code_to_insert.code_instructions_freedraw)
         result_lines.extend(code_to_insert.code_mainProgram_freedraw)
     elif line.startswith("draw"):
-        # Extraire les informations entre les parenthèses
+        # Extract the information inside the parentheses
             arguments = line[line.find("(") + 1: line.rfind(")")]
-            # Diviser les arguments
+            # Process each argument
             raw_args = code_to_insert.split_arguments(arguments)
             # Traiter chaque argument
-            shape = raw_args[0].strip()  # Premier argument : le type de forme (carre)
-            # Deuxième argument : couleur RGB (chaîne sous forme "255, 255, 255")
+            shape = raw_args[0].strip()  # First argument: type of shape 
+            # Second argument: RGB color (string in the form "255, 255, 255")
             couleur_raw = raw_args[1].strip("\"")
             resolved_couleur = []
 
             for part in couleur_raw.split(","):
                 part = part.strip()
-                if re.match(r'^[a-zA-Z_]\w*$', part):  # Vérifie si c'est une variable
+                if re.match(r'^[a-zA-Z_]\w*$', part): # Check if it's a variable
                     if part not in symbol_table:
                         raise ValueError(f"Variable '{part}' not declared.")
-                    resolved_couleur.append(symbol_table[part]["value"])  # Récupère la valeur de la variable
-                elif re.match(r'^-?\d+$', part):  # Vérifie si c'est un entier
+                    resolved_couleur.append(symbol_table[part]["value"])  # Retrieve the variable's value
+                elif re.match(r'^-?\d+$', part): # Check if it's an integer
                     resolved_couleur.append(int(part))
                 else:
                     raise ValueError(f"Invalid RGB component: '{part}'. Expected a variable or an integer.")
 
-            # Convertir la liste en tuple
+             # Convert the list to a tuple
             couleur = tuple(resolved_couleur)
-            r, g, b = couleur   # Extraire les couleurs RGB
+            r, g, b = couleur   # Extract the RGB colors
         
             
             if "carre" in line:
-                # Troisième argument : coordonnées (x, y) sous forme "10,10"
-                coordonnees_raw = raw_args[2].strip("\"")  # Enlever les guillemets autour des coordonnées
-                coordonnees = tuple(map(int, map(str.strip, coordonnees_raw.split(","))))  # Convertir en tuple d'entiers
+                 # Third argument: coordinates (x, y) in the form "10,10"
+                coordonnees_raw = raw_args[2].strip("\"")  
+                coordonnees = tuple(map(int, map(str.strip, coordonnees_raw.split(",")))) # Convert to a tuple of integers
                 taille = parse_or_variable(raw_args[3])
-                x, y = coordonnees  # Extraire les coordonnées
+                x, y = coordonnees  # Extract the coordinates
                 if not code_to_insert.check_comment_in_code(global_functions, "void drawCarre"):
                     global_functions.append("// Définition de la fonction drawCarre")
                     global_functions.extend(code_to_insert.code_drawCarre)
@@ -236,12 +232,12 @@ def line_translator(line,translate_print,window_created,symbol_table,global_func
                 result_lines.append("// Paramètres pour le carré :")
                 result_lines.extend(parametres_carre)
             elif "rectangle" in line:
-                # Troisième argument : coordonnées (x, y) sous forme "10,10"
-                coordonnees_raw = raw_args[2].strip("\"")  # Enlever les guillemets autour des coordonnées
-                coordonnees = tuple(map(int, map(str.strip, coordonnees_raw.split(","))))  # Convertir en tuple d'entiers
+               
+                coordonnees_raw = raw_args[2].strip("\"") 
+                coordonnees = tuple(map(int, map(str.strip, coordonnees_raw.split(","))))  
                 hauteur = parse_or_variable((raw_args[3]))
                 largeur = parse_or_variable(raw_args[4])
-                x, y = coordonnees  # Extraire les coordonnées
+                x, y = coordonnees  
                 if not code_to_insert.check_comment_in_code(global_functions, "void drawRectangle"):
                     global_functions.append("// Définition de la fonction drawRectangle")
                     global_functions.extend(code_to_insert.code_drawRectangle)
@@ -249,11 +245,10 @@ def line_translator(line,translate_print,window_created,symbol_table,global_func
                 result_lines.append("// Paramètres pour le rectangle :")
                 result_lines.extend(parametres_rectangle)
             elif "cercle" in line:
-                # Troisième argument : coordonnées (x, y) sous forme "10,10"
-                coordonnees_raw = raw_args[2].strip("\"")  # Enlever les guillemets autour des coordonnées
-                coordonnees = tuple(coord.strip() for coord in coordonnees_raw.split(","))  # Conserver les valeurs telles quelles
-                taille = parse_or_variable(raw_args[3])
-                x, y = coordonnees  # Extraire les coordonnées (elles restent des chaînes pour permettre des variables comme "i")
+                
+                coordonnees_raw = raw_args[2].strip("\"") 
+                coordonnees = tuple(coord.strip() for coord in coordonnees_raw.split(","))  
+                x, y = coordonnees  
                 if not code_to_insert.check_comment_in_code(global_functions, "void drawCercle"):
                     global_functions.append("// Définition de la fonction drawCercle")
                     global_functions.extend(code_to_insert.code_drawCercle)
@@ -261,14 +256,14 @@ def line_translator(line,translate_print,window_created,symbol_table,global_func
                 result_lines.append("// Paramètres pour le cercle :")
                 result_lines.extend(parametres_cercle)
             elif "triangle" in line:
-                # Extraire les coordonnées
-                coordonnees_raw = raw_args[2].strip("\"")  # Enlever les guillemets
+                
+                coordonnees_raw = raw_args[2].strip("\"") 
                 coordonnees = list(map(int, map(str.strip, coordonnees_raw.split(","))))  # Convertir en liste d'entiers
                 if len(coordonnees) != 6:
                     raise ValueError("Un triangle nécessite exactement 6 coordonnées (x1, y1, x2, y2, x3, y3).")
-                x1, y1, x2, y2, x3, y3 = coordonnees  # Extraire les 6 valeurs
-                r, g, b = couleur  # Couleur RGB
-                # Ajouter la fonction drawTriangle si elle n'existe pas
+                x1, y1, x2, y2, x3, y3 = coordonnees 
+                
+                
                 if not code_to_insert.check_comment_in_code(global_functions, "void drawTriangle"):
                     global_functions.append("// Définition de la fonction drawTriangle")
                     global_functions.extend(code_to_insert.code_drawTriangle)
@@ -276,11 +271,11 @@ def line_translator(line,translate_print,window_created,symbol_table,global_func
                 result_lines.append("// Paramètres pour le triangle:")
                 result_lines.extend(parametres_triangle)
             elif "polygon" in line:
-                # Troisième argument : coordonnées (x, y) sous forme "10,10"
-                coordonnees_raw = raw_args[2].strip("\"")  # Enlever les guillemets autour des coordonnées
-                coordonnees = tuple(map(int, map(str.strip, coordonnees_raw.split(","))))  # Convertir en tuple d'entiers
+                
+                coordonnees_raw = raw_args[2].strip("\"") 
+                coordonnees = tuple(map(int, map(str.strip, coordonnees_raw.split(","))))  
                 taille = parse_or_variable(raw_args[3])
-                x, y = coordonnees  # Extraire les coordonnées
+                x, y = coordonnees 
                 types_polygon = parse_or_variable(raw_args[4])
                 if not code_to_insert.check_comment_in_code(global_functions, "void drawPolygon"):
                     global_functions.append("// Définition de la fonction drawPolygon")
@@ -289,10 +284,10 @@ def line_translator(line,translate_print,window_created,symbol_table,global_func
                 result_lines.append("// Paramètres pour le polygone:")
                 result_lines.extend(parametres_polygon)
             elif "losange" in line:
-                 # Troisième argument : coordonnées (x, y) sous forme "10,10"
-                coordonnees_raw = raw_args[2].strip("\"")  # Enlever les guillemets autour des coordonnées
-                coordonnees = tuple(map(int, map(str.strip, coordonnees_raw.split(","))))  # Convertir en tuple d'entiers
-                x, y = coordonnees  # Extraire les coordonnées
+                
+                coordonnees_raw = raw_args[2].strip("\"") 
+                coordonnees = tuple(map(int, map(str.strip, coordonnees_raw.split(","))))  
+                x, y = coordonnees 
                 largeur=parse_or_variable(raw_args[3])
                 hauteur=parse_or_variable(raw_args[4])
                 if not code_to_insert.check_comment_in_code(global_functions, "void drawLosange"):
@@ -302,16 +297,15 @@ def line_translator(line,translate_print,window_created,symbol_table,global_func
                 result_lines.append("// Paramètres pour le losange:")
                 result_lines.extend(parametres_losange)
             elif "trapeze" in line:
-               # Troisième argument : coordonnées (x, y) sous forme "10,10"
-                coordonnees_raw = raw_args[2].strip("\"")  # Enlever les guillemets autour des coordonnées
-                coordonnees = tuple(map(int, map(str.strip, coordonnees_raw.split(","))))  # Convertir en tuple d'entiers
-                x, y = coordonnees  # Extraire les coordonnées
-                # Extraction des arguments
+              
+                coordonnees_raw = raw_args[2].strip("\"")  
+                coordonnees = tuple(map(int, map(str.strip, coordonnees_raw.split(","))))  
+                x, y = coordonnees  
+            
                 largeur_haut = parse_or_variable(raw_args[3])
                 largeur_bas = parse_or_variable(raw_args[4])
                 hauteur = parse_or_variable(raw_args[5])
-                r, g, b = couleur  # Couleur RGB
-                # Insérer le code pour dessiner le trapèze
+                r, g, b = couleur  
                 if not code_to_insert.check_comment_in_code(global_functions, "void drawTrapeze"):
                     global_functions.append("// Définition de la fonction drawTrapeze")
                     global_functions.extend(code_to_insert.code_drawTrapeze)
@@ -319,26 +313,21 @@ def line_translator(line,translate_print,window_created,symbol_table,global_func
                 result_lines.append("// Paramètres pour le trapeze:")
                 result_lines.extend(parametres_trapeze)
             elif "line" in line:
-                # Extraire les arguments : coordonnées x1, y1, x2, y2, et couleur RGB
-                coordonnees_raw = raw_args[2].strip("\"")  # Coordonnées sous forme de "x1, y1, x2, y2"
-                coordonnees = tuple(map(int, map(str.strip, coordonnees_raw.split(","))))  # Convertir en tuple (x1, y1, x2, y2)
+                # Extract arguments: coordinates x1, y1, x2, y2, and RGB color
+                coordonnees_raw = raw_args[2].strip("\"")   # Coordinates in the form "x1, y1, x2, y2"
+                coordonnees = tuple(map(int, map(str.strip, coordonnees_raw.split(",")))) # Convert to a tuple (x1, y1, x2, y2)
                 r, g, b = couleur  # Couleur RGB
-                x1, y1, x2, y2 = coordonnees  # Extraire les coordonnées x1, y1, x2, y2
-                # Ajouter la fonction drawLine si elle n'existe pas déjà
+                x1, y1, x2, y2 = coordonnees  # Extract coordinates x1, y1, x2, y2
                 if not code_to_insert.check_comment_in_code(global_functions, "void drawLine"):
                     global_functions.append("// Définition de la fonction drawLine")
                     global_functions.extend(code_to_insert.code_drawLine)
-                # Générer les paramètres pour dessiner la ligne
                 parametres_line = code_to_insert.get_parametres_line(x1, y1, x2, y2, r, g, b)
                 result_lines.append("// Paramètres pour le line:")
                 result_lines.extend(parametres_line)
     elif line.startswith("window"):
-      # Extraire les informations entre les parenthèses
         arguments = line[line.find("(") + 1: line.rfind(")")]
         coordonnees, x, y, r, g, b = code_to_insert.extract_window_params(arguments)
-        # Préparer les paramètres pour la fenêtre
         parametres_window = code_to_insert.get_parametres_window(x, y, r, g, b)
-        # Mode dimensions personnalisées
         result_lines.append("// Paramètres pour la fenêtre avec dimensions personnalisées :")
         result_lines.extend(parametres_window)
         if not code_to_insert.check_comment_in_code(result_lines, "//Create window custom"):
@@ -356,7 +345,6 @@ def line_translator(line,translate_print,window_created,symbol_table,global_func
             else:
                 result_lines.append(f"{function_name}(renderer, {args});")
         else:
-            # version sans parenthèses ?
             match_call_no_paren = re.match(r'^call\s+([a-zA-Z_]\w*)$', line)
             if match_call_no_paren:
                 function_name = match_call_no_paren.group(1)
@@ -369,7 +357,7 @@ def line_translator(line,translate_print,window_created,symbol_table,global_func
         var_name = left_side.strip()
         value = right_side.strip()
  
-        # Vérifier si la valeur est une expression
+         # Check if the value is an expression
         if re.search(r'[+\-*/]', value):
             terms = re.split(r'([+\-*/])', value)
             for term in terms:
@@ -377,7 +365,7 @@ def line_translator(line,translate_print,window_created,symbol_table,global_func
                 if re.match(r'[a-zA-Z_]\w*', term) and term not in {'+', '-', '*', '/'}:
                     if term not in symbol_table:
                         raise ValueError(f"Variable '{term}' not declared.")
-                    # Vérifiez le type de la variable utilisée
+                     # Verify the type of the variable used
                     if symbol_table[term]["type"] != "int":
                         raise ValueError(f"Invalid type '{symbol_table[term]['type']}' for variable '{term}' in expression.")
             result_lines.append(f"int {var_name} = {value};")
@@ -392,13 +380,13 @@ def line_translator(line,translate_print,window_created,symbol_table,global_func
             var_type = "string"
             result_lines.append(f"char* {var_name} = {value};")
         else:
-            # On suppose que la valeur est une autre variable
+            # Assume the value is another variable
             if value not in symbol_table:
                 raise ValueError(f"Variable '{value}' not declared.")
             var_type = symbol_table[value]["type"]
             result_lines.append(f"{var_type} {var_name} = {value};")
  
-        # Mettre à jour la symbol_table avec la nouvelle variable
+        # Update the symbol_table with the new variable
         symbol_table[var_name] = {"type": var_type}
  
  
@@ -409,7 +397,7 @@ def line_translator(line,translate_print,window_created,symbol_table,global_func
         result_lines.append(line + ";")
  
     else:
-        # Par défaut, on laisse la ligne telle quelle
+        # By default, keep the line as-is
         result_lines.append(line)
  
     return result_lines
