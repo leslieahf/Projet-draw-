@@ -1,6 +1,0 @@
-Cursor() return c
-Show_specificitiesofcursor(c)
-Rotate(c)
-Move(c)
-shape_draw()
-Draw(c) "Appel de shape_draw() , Move() et Rotate()"
