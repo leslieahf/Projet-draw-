@@ -247,7 +247,8 @@ def line_translator(line,translate_print,window_created,symbol_table,global_func
             elif "cercle" in line:
                 
                 coordonnees_raw = raw_args[2].strip("\"") 
-                coordonnees = tuple(coord.strip() for coord in coordonnees_raw.split(","))  
+                coordonnees = tuple(coord.strip() for coord in coordonnees_raw.split(","))
+                taille = parse_or_variable(raw_args[3])
                 x, y = coordonnees  
                 if not code_to_insert.check_comment_in_code(global_functions, "void drawCercle"):
                     global_functions.append("// Définition de la fonction drawCercle")
