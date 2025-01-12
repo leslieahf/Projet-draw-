@@ -140,13 +140,13 @@ def translate_to_c(draw_code):
             # Ici, on peut réutiliser la logique existante de traduction,
             # mais on l’applique à current_func_buffer au lieu de main_code.
             
-            translated_line = line_translator(line, functions_code, translate_print,window_created,symbol_table,global_functions)
+            translated_line = line_translator(line, translate_print,window_created,symbol_table,global_functions)
             # On stocke le résultat
             current_func_buffer.extend(translated_line)
         
         else:
             # On est en dehors d’une fonction : on applique la même logique de traduction
-            translated_line = line_translator(line, functions_code, translate_print,window_created,symbol_table,global_functions)
+            translated_line = line_translator(line,translate_print,window_created,symbol_table,global_functions)
             main_code.extend(translated_line)
  
  
@@ -177,7 +177,8 @@ def translate_to_c(draw_code):
     for line in main_code:
         c_code.append("    " + line)
     # On termine
-    code_to_insert.insert_code_if_comment_not_present(c_code, code_to_insert.code_staywindow_open, "// Garder la fenêtre ouverte en permanence avec une boucle événementielle")
+    if code_to_insert.check_comment_in_code(c_code, "// Garder la fenêtre ouverte en permanence avec une boucle événementielle") == 0:
+        code_to_insert.insert_code_if_comment_not_present(c_code, code_to_insert.code_staywindow_open, "// Garder la fenêtre ouverte en permanence avec une boucle événementielle")
     c_code.append("    return 0;")
     c_code.append("}\n")
  
@@ -185,14 +186,7 @@ def translate_to_c(draw_code):
     return "\n".join(c_code)
  
  
-def line_translator(line,functions_code,translate_print,window_created,symbol_table,global_functions):
-    """
-    Traduit **une** ligne de draw++ en une ou plusieurs lignes de C.
-    Retourne une liste de lignes (sans le \n final).
-    
-    On factorise ici pour pouvoir réutiliser la logique
-    aussi bien dans le main que dans le corps des fonctions.
-    """
+def line_translator(line,translate_print,window_created,symbol_table,global_functions):
     line = line.strip()
     result_lines = []
  
@@ -200,7 +194,7 @@ def line_translator(line,functions_code,translate_print,window_created,symbol_ta
     # Ici, je prends des extraits de ton code existant et je simplifie.
     if line.startswith("freedraw"):
         result_lines.append("// Freedraw: insertion du code_instructions_freedraw")
-        result_lines.extend(code_to_insert.code_instructions_freedraw)
+        global_functions.extend(code_to_insert.code_instructions_freedraw)
         result_lines.extend(code_to_insert.code_mainProgram_freedraw)
     elif line.startswith("draw"):
         # Extraire les informations entre les parenthèses
@@ -233,7 +227,7 @@ def line_translator(line,functions_code,translate_print,window_created,symbol_ta
                 # Troisième argument : coordonnées (x, y) sous forme "10,10"
                 coordonnees_raw = raw_args[2].strip("\"")  # Enlever les guillemets autour des coordonnées
                 coordonnees = tuple(map(int, map(str.strip, coordonnees_raw.split(","))))  # Convertir en tuple d'entiers
-                taille = int(raw_args[3])
+                taille = parse_or_variable(raw_args[3])
                 x, y = coordonnees  # Extraire les coordonnées
                 if not code_to_insert.check_comment_in_code(global_functions, "void drawCarre"):
                     global_functions.append("// Définition de la fonction drawCarre")
