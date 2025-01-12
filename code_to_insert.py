@@ -440,6 +440,7 @@ code_instructions_freedraw = [
     "    const char* instructions[] = {",
     "        \"=== Commandes ===\",",
     "        \"Clique gauche : Dessiner\",",
+    "        \"R : Rouge | G : Vert | B : Bleu\",",
     "        \"E : Activer/Désactiver la gomme\",",
     "        \"A : Augmenter la taille du pinceau\",",
     "        \"M : Reduire la taille du pinceau\",",
