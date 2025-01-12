@@ -1,18 +1,18 @@
 import tkinter as tk
+from tkinter import filedialog, scrolledtext, messagebox
+import subprocess
 import syntaxe
 from tok import Lexer
 from parseur import Parser
-from tkinter import filedialog, scrolledtext, messagebox
-import subprocess
 import translate_to_c
 from pygments import lex
 from pygments.lexers import PythonLexer
 from pygments.token import Token
- 
+
 root = tk.Tk()
 root.title("IDE DRAW++")
 
-# Open filex
+# Open file
 def open_file():
     file_path = filedialog.askopenfilename(filetypes=[("Python Files", "*.py"), ("Text Files", "*.txt")])
     if file_path:
@@ -73,25 +73,22 @@ output_area.pack(fill=tk.BOTH, expand=True)
 # Update line numbers every 100 ms
 update_line_numbers()
 
-
+# Highlight error
 def highlight_error(line_number, column_start, column_end):
-    """
-    Souligne en rouge une portion spécifique dans le Text Widget.
-    :param line_number: Numéro de la ligne où l'erreur est détectée.
-    :param column_start: Début de la colonne où l'erreur commence.
-    :param column_end: Fin de la colonne où l'erreur termine.
-    """
     text_area.tag_remove("error", "1.0", tk.END)  # Supprime les anciens soulignages
     start_index = f"{line_number}.{column_start}"
     end_index = f"{line_number}.{column_end}"
     text_area.tag_add("error", start_index, end_index)  # Ajoute le soulignage rouge
-    text_area.tag_config("error", underline = 1, foreground="#E57373")  # Configure le style
+    text_area.tag_config("error", underline=1, foreground="#E57373")  # Configure le style
 
-
-
-# Mise à jour de la fonction principale
+# Generate and run C code
 def generate_and_run_c_code():
     draw_code = text_area.get("1.0", tk.END).strip()  # Récupère le code de l'éditeur
+
+    # Vérification si l'utilisateur a tapé "help()"
+    if draw_code.lower() == "help()":
+        display_help()  # Affiche les instructions
+        return
 
     # Validation complète via syntaxe.py
     errors, tokens, ast = syntaxe.validate_code(draw_code)
@@ -100,25 +97,16 @@ def generate_and_run_c_code():
         output_area.insert(tk.END, "Erreurs détectées :\n")
         for error in errors:
             output_area.insert(tk.END, f"{error}\n")
-
-            # Extraction du numéro de ligne et suggestion (si applicable)
             if "line" in error:
                 try:
                     line_number = int(error.split("line")[1].split()[0])
-                    # Surligne la ligne de l'erreur
                     column_start = 0
                     column_end = len(draw_code.split("\n")[line_number - 1])
                     highlight_error(line_number, column_start, column_end)
                 except (ValueError, IndexError):
-                    pass  # Ignore si une erreur se produit dans l'analyse
+                    pass
         output_area.insert(tk.END, "\n\nExécution annulée.")
         return
-
-    # Debug : Afficher les tokens et l'AST pour le suivi
-    print("Tokens générés :")
-    for token in tokens:
-        print(token)
-    print("AST généré :", ast)
 
     # Si tout est OK, continuez avec la traduction en C et l'exécution
     try:
@@ -126,7 +114,7 @@ def generate_and_run_c_code():
         with open("generated_program.c", "w") as file:
             file.write(c_code)
 
-        compile_command = ["gcc", "generated_program.c", "-o", "generated_program", "-lSDL2", "-lSDL2_ttf" ,"-lm"]
+        compile_command = ["gcc", "generated_program.c", "-o", "generated_program", "-lSDL2", "-lSDL2_ttf", "-lm"]
         result = subprocess.run(compile_command, capture_output=True, text=True)
 
         if result.returncode == 0:
@@ -154,11 +142,32 @@ def display_help(event=None):
     help_text = """
     DRAW++ COMMANDS:
     ------------------
-    1. draw_line(x1, y1, x2, y2): Draws a line from (x1, y1) to (x2, y2).
-    2. draw_circle(x, y, radius): Draws a circle with center (x, y) and given radius.
-    3. draw_rectangle(x, y, width, height): Draws a rectangle with top-left (x, y).
-    4. set_color(r, g, b): Sets the color for future drawing commands.
-    5. clear(): Clears the drawing canvas.
+    1. draw commands :
+        draw(cercle,"R,G,B","x,y",rayon)
+        draw(rectangle,"R,G,B","x,y",largeur,hauteur)
+        draw(triangle,"R,G,B","x1,y1,x2,y2,x3,y3")
+        draw(line,"R,G,B","x1,y1,x2,y2")
+        drax(losange,"R,G,B","x,y",largeur,hauteur)
+        draw(carre,"R,G,B","x,y",cote)
+        draw(polygon,"R,G,B","x,y",rayon,n)
+        draw(trapeze,"R,G,B","x,y",base1,base2,hauteur)
+    2. boucles:
+        variable <- valeur
+        for(variable;varable condition valeur;variable++){
+        //bloc instruction
+        }
+    3. condition:
+        if(variable condition valeur){
+        bloc instruction
+        }else{
+        //bloc instruction
+        }
+    4. fonction:
+        func nomfonction(variable){
+        //bloc instruction
+        return 0;
+        }
+        call nomfonction()
 
     Type these commands in the editor and execute them!
     """
@@ -167,12 +176,13 @@ def display_help(event=None):
 
 text_area.bind("<Return>", lambda event: check_help_command())
 
+# Function to check for "help()" command
 def check_help_command():
     current_text = text_area.get("1.0", tk.END).strip()
-    if current_text.endswith("help"):
+    if current_text.endswith("help()"):
         display_help()
 
 # Main loop
 root.mainloop()
- 
+
  
